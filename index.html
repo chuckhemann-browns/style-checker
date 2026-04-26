@@ -375,7 +375,7 @@
       <div class="step">
         <div class="step-num">01</div>
         <div class="step-title">Add your style guide</div>
-        <div class="step-body">Paste your writing rules as plain text, or upload a .txt or .md file. Use the built-in default — Chuck Hemann's Style Guide v4 — to see it in action, or load a journalism, business, or newsletter template.</div>
+        <div class="step-body">Paste your writing rules as plain text, or upload a .txt or .md file. Load an example — journalism, business, newsletter, or Chuck Hemann's Style Guide — to see it in action, or paste your own.</div>
       </div>
       <div class="step">
         <div class="step-num">02</div>
@@ -420,7 +420,7 @@
       </div>
       <div class="examples-row">
         <span class="examples-label">Examples:</span>
-        <button class="btn-ghost active" id="eg-chuck" onclick="loadExample('chuck')">Chuck Hemann</button>
+        <button class="btn-ghost" id="eg-chuck" onclick="loadExample('chuck')">Chuck Hemann's Style Guide — April 2026</button>
         <button class="btn-ghost" id="eg-journalism" onclick="loadExample('journalism')">Journalism</button>
         <button class="btn-ghost" id="eg-business" onclick="loadExample('business')">Business</button>
         <button class="btn-ghost" id="eg-newsletter" onclick="loadExample('newsletter')">Newsletter</button>
@@ -582,15 +582,14 @@ let activeExample = 'chuck';
 document.addEventListener('DOMContentLoaded', () => {
   const savedKey   = localStorage.getItem('sc_key');
   const savedGuide = localStorage.getItem('sc_guide');
-  const savedEx    = localStorage.getItem('sc_example') || 'chuck';
+  const savedEx    = localStorage.getItem('sc_example');
 
   if (savedKey) document.getElementById('apiKey').value = savedKey;
 
   if (savedGuide) {
     document.getElementById('styleGuide').value = savedGuide;
-    // Deactivate all example buttons if custom guide
     setActiveExample(null);
-  } else {
+  } else if (savedEx) {
     loadExample(savedEx, false);
   }
 
