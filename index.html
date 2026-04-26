@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/docx@8.5.0/build/index.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -312,6 +313,20 @@
     .footer-r a { color: var(--text-3); text-decoration: none; }
     .footer-r a:hover { color: var(--gold); }
 
+    /* ── Revised Draft panel ── */
+    .revised-section { display: none; border-top: 2px solid var(--border); background: var(--navy-2); flex-shrink: 0; }
+    .revised-section.visible { display: block; }
+    .revised-header { display: flex; align-items: center; gap: 14px; padding: 14px 30px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .revised-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.9rem; letter-spacing: 2px; color: var(--gold); }
+    .revised-hint { font-size: 0.73rem; color: var(--text-3); flex: 1; }
+    .revised-export-btns { display: flex; gap: 7px; flex-wrap: wrap; }
+    .btn-export { font-family: 'Outfit', sans-serif; font-size: 0.76rem; font-weight: 600; padding: 6px 14px; border-radius: 5px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surf-2); color: var(--text-2); transition: background 0.18s, color 0.18s; white-space: nowrap; }
+    .btn-export:hover { background: var(--border); color: var(--text); }
+    .btn-export.primary { border-color: var(--gold); color: var(--gold); }
+    .btn-export.primary:hover { background: rgba(212,175,55,0.1); }
+    #revisedArea { display: block; width: calc(100% - 60px); min-height: 220px; max-height: 480px; margin: 16px 30px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.87rem; line-height: 1.65; padding: 14px 16px; resize: vertical; outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+    #revisedArea.flash { border-color: var(--green); box-shadow: 0 0 0 3px rgba(61,184,122,0.18); }
+
     @media (max-width: 900px) {
       #tool { grid-template-columns: 1fr; }
       .left { border-right: none; border-bottom: 1px solid var(--border); }
@@ -321,6 +336,8 @@
       .how { padding: 48px 24px; }
       .right { padding: 20px 16px 40px; }
       .footer { padding: 14px 20px; flex-direction: column; align-items: flex-start; }
+      #revisedArea { width: calc(100% - 32px); margin: 14px 16px 16px; }
+      .revised-header { padding: 12px 16px; }
     }
   </style>
 </head>
@@ -471,6 +488,20 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Revised Draft -->
+<div class="revised-section" id="revisedSection">
+  <div class="revised-header">
+    <div class="revised-label">Revised Draft</div>
+    <div class="revised-hint">Updates as you apply fixes</div>
+    <div class="revised-export-btns">
+      <button class="btn-export" onclick="copyDraft()">Copy</button>
+      <button class="btn-export" onclick="exportTxt()">Download .txt</button>
+      <button class="btn-export primary" onclick="exportDocx()">Download .docx</button>
+    </div>
+  </div>
+  <textarea id="revisedArea" readonly></textarea>
 </div>
 
 <footer class="footer">
@@ -874,6 +905,8 @@ function render(result, draft) {
 
   if (!flags.length) {
     results.innerHTML = `<div class="all-clear"><div class="all-clear-n">0</div><div class="all-clear-sub">${wc} words. No violations found.</div></div>`;
+    syncRevised();
+    document.getElementById('revisedSection').classList.add('visible');
     return;
   }
 
@@ -882,6 +915,8 @@ function render(result, draft) {
   if (warns.length)  { html += `<div class="section-head">Warnings (${warns.length})</div>`;    warns.forEach(f  => { html += card(f, flags.indexOf(f)); }); }
   if (infos.length)  { html += `<div class="section-head">Suggestions (${infos.length})</div>`; infos.forEach(f  => { html += card(f, flags.indexOf(f)); }); }
   results.innerHTML = html;
+  syncRevised();
+  document.getElementById('revisedSection').classList.add('visible');
 }
 
 function card(f, idx) {
@@ -908,6 +943,8 @@ function applyFix(idx) {
   ta.value = ta.value.slice(0, i) + (f.replacement || '') + ta.value.slice(i + f.original.length);
   const el = document.querySelector(`[data-idx="${idx}"]`);
   if (el) { el.classList.add('applied'); const b = el.querySelector('.btn-apply'); if (b) { b.textContent = 'Applied'; b.disabled = true; } }
+  syncRevised();
+  flashRevised();
   toast('Applied — re-check when ready');
 }
 
@@ -943,6 +980,56 @@ function toast(msg) {
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function trunc(s, n=110) { s=s.trim(); return s.length>n ? s.slice(0,n).trim()+'…' : s; }
+
+// ── Revised Draft ──────────────────────────────────────────────────────────────
+function syncRevised() {
+  const ra = document.getElementById('revisedArea');
+  if (ra) ra.value = document.getElementById('draft').value;
+}
+
+function flashRevised() {
+  const ra = document.getElementById('revisedArea');
+  if (!ra) return;
+  ra.classList.remove('flash');
+  void ra.offsetWidth;
+  ra.classList.add('flash');
+  setTimeout(() => ra.classList.remove('flash'), 900);
+}
+
+function copyDraft() {
+  navigator.clipboard.writeText(document.getElementById('draft').value)
+    .then(() => toast('Copied to clipboard'))
+    .catch(() => toast('Copy failed — select all and copy manually'));
+}
+
+function exportTxt() {
+  const text = document.getElementById('draft').value;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'revised-draft.txt'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Downloaded revised-draft.txt');
+}
+
+async function exportDocx() {
+  const text = document.getElementById('draft').value;
+  try {
+    const { Document, Packer, Paragraph, TextRun } = docx;
+    const children = text.split('\n').map(line =>
+      new Paragraph({ children: [new TextRun(line || '')] })
+    );
+    const doc  = new Document({ sections: [{ children }] });
+    const blob = await Packer.toBlob(doc);
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'revised-draft.docx'; a.click();
+    URL.revokeObjectURL(url);
+    toast('Downloaded revised-draft.docx');
+  } catch (e) {
+    toast('Export failed — try .txt instead');
+  }
+}
 </script>
 </body>
 </html>
