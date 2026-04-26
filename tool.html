@@ -45,7 +45,12 @@
     /* ── Tool layout ── */
     #tool { flex: 1; display: grid; grid-template-columns: 400px 1fr; min-height: 0; }
 
-    /* ── Left panel ── */
+    /* Results mode: revised draft becomes left column, results on right */
+    #tool.results-mode { grid-template-columns: 1fr 1fr; }
+    #tool.results-mode .left { display: none; }
+    #tool.results-mode #revisedPanel { display: flex; }
+
+    /* ── Left panel (inputs) ── */
     .left { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--navy-2); overflow-y: auto; }
     .input-block { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 9px; }
     .block-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -72,7 +77,6 @@
     textarea::placeholder { color: var(--text-3); font-size: 0.82rem; }
     #styleGuide { min-height: 130px; }
     #draft { min-height: 180px; }
-    textarea.found { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.2); }
 
     .btn-ghost { font-family: 'Outfit', sans-serif; font-size: 0.71rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surf-2); color: var(--text-2); transition: background 0.18s, color 0.18s; white-space: nowrap; }
     .btn-ghost:hover { background: var(--border); color: var(--text); }
@@ -88,14 +92,17 @@
     .btn-check:disabled { opacity: 0.45; cursor: not-allowed; }
     .check-hint { text-align: center; font-size: 0.72rem; color: var(--text-3); }
 
-    /* ── Right panel ── */
-    .right { display: flex; flex-direction: column; overflow: hidden; }
-
-    /* ── Revised Draft (top of right) ── */
-    .revised-section { display: none; background: var(--surf-2); border-bottom: 2px solid var(--border); flex-shrink: 0; transition: box-shadow 0.3s; }
-    .revised-section.visible { display: flex; flex-direction: column; }
-    .revised-section.flash { box-shadow: inset 0 0 0 2px var(--green); }
-    .revised-header { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
+    /* ── Revised Draft panel (hidden until results-mode) ── */
+    #revisedPanel {
+      display: none;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--navy-2);
+      overflow: hidden;
+      transition: box-shadow 0.3s;
+    }
+    #revisedPanel.flash { box-shadow: inset 0 0 0 2px var(--green); }
+    .revised-header { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; background: var(--surf-2); }
     .revised-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; letter-spacing: 2px; color: var(--gold); }
     .revised-hint { font-size: 0.71rem; color: var(--text-3); flex: 1; }
     .revised-export-btns { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -103,11 +110,12 @@
     .btn-export:hover { background: var(--border); color: var(--text); }
     .btn-export.primary { border-color: var(--gold); color: var(--gold); }
     .btn-export.primary:hover { background: rgba(212,175,55,0.1); }
-    .revised-display { overflow-y: auto; min-height: 100px; max-height: 240px; background: var(--surface); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.86rem; line-height: 1.65; padding: 12px 20px; word-break: break-word; }
-    .revised-display p { margin-bottom: 0.4em; min-height: 1.2em; }
-    .revised-display mark { background: rgba(212,175,55,0.35); color: var(--text); border-radius: 2px; padding: 1px 2px; }
+    #revisedDisplay { flex: 1; overflow-y: auto; background: var(--surface); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.88rem; line-height: 1.7; padding: 20px 24px; word-break: break-word; }
+    #revisedDisplay p { margin-bottom: 0.5em; min-height: 1.2em; }
+    #revisedDisplay mark { background: rgba(212,175,55,0.4); color: var(--text); border-radius: 2px; padding: 1px 3px; }
 
-    /* ── Results ── */
+    /* ── Right panel (results) ── */
+    .right { display: flex; flex-direction: column; overflow: hidden; }
     .results-wrap { flex: 1; min-height: 0; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
     .results-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.88rem; letter-spacing: 2px; color: var(--red); padding-bottom: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
@@ -173,8 +181,9 @@
 
     @media (max-width: 900px) {
       body { overflow: auto; height: auto; }
-      #tool { grid-template-columns: 1fr; }
+      #tool { grid-template-columns: 1fr !important; }
       .left { border-right: none; border-bottom: 1px solid var(--border); }
+      #revisedPanel { border-right: none; border-bottom: 1px solid var(--border); min-height: 360px; }
       .right { min-height: 600px; }
       .nav { padding: 10px 16px; }
       .footer { padding: 11px 16px; flex-direction: column; align-items: flex-start; }
@@ -195,7 +204,7 @@
 
 <div id="tool">
 
-  <!-- Left: inputs -->
+  <!-- Column 1: Inputs (visible by default, hidden in results-mode) -->
   <div class="left">
 
     <!-- API Key -->
@@ -247,28 +256,26 @@
     <!-- Check -->
     <div class="check-block">
       <button class="btn-check" id="checkBtn" onclick="runCheck()">Check Style</button>
-      <div class="check-hint">Cmd + Enter &middot; Results appear on the right</div>
+      <div class="check-hint">Cmd + Enter &middot; Results appear alongside your revised draft</div>
     </div>
   </div>
 
-  <!-- Right: revised draft + results -->
-  <div class="right">
-
-    <!-- Revised Draft — appears at top after first check -->
-    <div class="revised-section" id="revisedSection">
-      <div class="revised-header">
-        <div class="revised-label">Revised Draft</div>
-        <div class="revised-hint">Updates as you apply fixes</div>
-        <div class="revised-export-btns">
-          <button class="btn-export" onclick="copyDraft()">Copy</button>
-          <button class="btn-export" onclick="exportTxt()">Download .txt</button>
-          <button class="btn-export primary" onclick="exportDocx()">Download .docx</button>
-        </div>
+  <!-- Column 1 (results-mode): Revised Draft -->
+  <div id="revisedPanel">
+    <div class="revised-header">
+      <div class="revised-label">Revised Draft</div>
+      <div class="revised-hint">Updates as you apply fixes &middot; Find highlights in-place</div>
+      <div class="revised-export-btns">
+        <button class="btn-export" onclick="copyDraft()">Copy</button>
+        <button class="btn-export" onclick="exportTxt()">Download .txt</button>
+        <button class="btn-export primary" onclick="exportDocx()">Download .docx</button>
       </div>
-      <div id="revisedDisplay" class="revised-display"></div>
     </div>
+    <div id="revisedDisplay"></div>
+  </div>
 
-    <!-- Results -->
+  <!-- Column 2: Results -->
+  <div class="right">
     <div class="results-wrap">
       <div class="results-label">Results</div>
       <div class="score-bar" id="scoreBar">
@@ -289,8 +296,8 @@
         </div>
       </div>
     </div>
-
   </div>
+
 </div>
 
 <footer class="footer">
@@ -678,8 +685,9 @@ function render(result, draft) {
   detail.textContent  = `${flags.length} flag${flags.length !== 1 ? 's' : ''} · ${wc} words`;
   summary.textContent = result.summary || '';
 
+  // Switch to results-mode: hide inputs, show Revised Draft as left column
+  document.getElementById('tool').classList.add('results-mode');
   syncRevised();
-  document.getElementById('revisedSection').classList.add('visible');
 
   if (!flags.length) {
     results.innerHTML = `<div class="all-clear"><div class="all-clear-n">0</div><div class="all-clear-sub">${wc} words. No violations found.</div></div>`;
@@ -695,7 +703,7 @@ function render(result, draft) {
 
 function card(f, idx) {
   const findText = f.original || f.quote || '';
-  const findBtn  = findText ? `<button class="btn-find" onclick="findInDraft(${JSON.stringify(findText)})">Find</button>` : '';
+  const findBtn  = findText ? `<button class="btn-find" onclick="findInRevised(${JSON.stringify(findText)})">Find</button>` : '';
   const applyBtn = (f.original && f.replacement != null) ? `<button class="btn-apply" onclick="applyFix(${idx})">Apply</button>` : '';
   const sug = f.suggestion ? `<div class="suggestion"><div class="sug-tag">Try</div><div class="sug-text">${esc(f.suggestion)}</div>${applyBtn}</div>` : '';
   return `<div class="flag ${f.level}" data-idx="${idx}">
@@ -721,22 +729,12 @@ function applyFix(idx) {
   toast('Applied — re-check when ready');
 }
 
-function findInDraft(text) {
+function findInRevised(text) {
   if (!text) return;
-  const ta  = document.getElementById('draft');
-  const idx = ta.value.toLowerCase().indexOf(text.toLowerCase());
+  const draft = document.getElementById('draft').value;
+  const idx   = draft.toLowerCase().indexOf(text.toLowerCase());
   if (idx === -1) { toast('Not found — may already be changed'); return; }
-
-  // Highlight in the Revised Draft div (reliable, works every time)
-  const section = document.getElementById('revisedSection');
-  if (section && section.classList.contains('visible')) {
-    highlightInRevised(text);
-  }
-
-  // Keep draft textarea marked for Apply accuracy
-  ta.classList.add('found');
-  setTimeout(() => ta.classList.remove('found'), 1500);
-  ta.scrollTop = (idx / Math.max(1, ta.value.length)) * ta.scrollHeight;
+  highlightInRevised(text);
 }
 
 function highlightInRevised(searchText) {
@@ -792,12 +790,12 @@ function syncRevised() {
 }
 
 function flashRevised() {
-  const section = document.getElementById('revisedSection');
-  if (!section) return;
-  section.classList.remove('flash');
-  void section.offsetWidth;
-  section.classList.add('flash');
-  setTimeout(() => section.classList.remove('flash'), 900);
+  const panel = document.getElementById('revisedPanel');
+  if (!panel) return;
+  panel.classList.remove('flash');
+  void panel.offsetWidth;
+  panel.classList.add('flash');
+  setTimeout(() => panel.classList.remove('flash'), 900);
 }
 
 function resetTool() {
@@ -805,8 +803,8 @@ function resetTool() {
   document.getElementById('results').innerHTML = `<div class="empty-state">Paste your style guide and draft on the left.<br>Hit Check Style.<br>Violations appear here, sorted by severity.</div>`;
   document.getElementById('scoreBar').classList.remove('visible');
   document.getElementById('scoreNum').textContent = '0';
-  document.getElementById('revisedSection').classList.remove('visible');
   document.getElementById('revisedDisplay').innerHTML = '';
+  document.getElementById('tool').classList.remove('results-mode');
   currentFlags = [];
 }
 
