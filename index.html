@@ -424,6 +424,10 @@
         <button class="btn-ghost" id="eg-journalism" onclick="loadExample('journalism')">Journalism</button>
         <button class="btn-ghost" id="eg-business" onclick="loadExample('business')">Business</button>
         <button class="btn-ghost" id="eg-newsletter" onclick="loadExample('newsletter')">Newsletter</button>
+        <button class="btn-ghost" id="eg-linkedin" onclick="loadExample('linkedin')">LinkedIn & Thought Leadership</button>
+        <button class="btn-ghost" id="eg-technical" onclick="loadExample('technical')">Technical & Docs</button>
+        <button class="btn-ghost" id="eg-pr" onclick="loadExample('pr')">PR & Press Release</button>
+        <button class="btn-ghost" id="eg-executive" onclick="loadExample('executive')">Executive Comms</button>
       </div>
       <textarea id="styleGuide" placeholder="Paste your style guide — voice, rules, vocabulary, structure, tone. The more specific, the better." spellcheck="false"></textarea>
     </div>
@@ -550,6 +554,98 @@ STRUCTURE:
 - If the document is longer than one page, include a summary at the top.
 - Close with a clear next step: who does what by when. Never close with an open question.`,
 
+  linkedin: `LinkedIn & Thought Leadership Style Guide
+
+HARD RULES:
+- Open with a hook, not a preamble. The first line must earn the scroll stop. "In today's competitive landscape..." is an auto-scroll. Start with a specific observation, a contrarian claim, or a number that surprises.
+- No walls of text. Every 2-3 sentences, hit return. White space is structure on LinkedIn.
+- Close declaratively. Your final line is a position, not a question. "What do you think?" and "Would love your thoughts" are soft closes — cut them.
+- One idea per post. LinkedIn posts that try to make three points make zero.
+
+WARNINGS:
+- No corporate buzzwords: synergy, leverage, utilize, circle back, move the needle, best practices, thought leader, game-changer, disruptive, scalable, ecosystem, space (as in "in the [X] space").
+- Avoid the false story open: "I was sitting in a meeting when it hit me..." — only works if the story leads directly to a non-obvious insight.
+- Do not ask engagement-bait questions at the end: "Drop a comment below," "Tag someone who needs to hear this," "Double tap if you agree."
+- No passive voice. LinkedIn rewards confidence. "Mistakes were made" → "We made a mistake."
+- Avoid humble-brag framing: "Humbled and honored to share..." Just share it.
+
+STRUCTURE:
+- Line 1: the hook — a claim, stat, or observation. No setup.
+- Lines 2-5: the tension or context. Why does this matter right now?
+- Lines 6-10: the insight, framework, or takeaway. Numbered lists work well here.
+- Final line: a declaration. Your position, stated plainly.
+- No sign-off. No "- [Name]". Your name is already on the post.`,
+
+  technical: `Technical Writing & Documentation Style Guide
+
+HARD RULES:
+- Write for the person trying to accomplish a task, not the person trying to understand a system. Every sentence should move the reader closer to completing something.
+- Use imperative voice for instructions: "Click Save," not "You should click Save" or "The user clicks Save."
+- One step per numbered item. Never combine two actions in one step.
+- Code, commands, file names, and UI labels go in code formatting. Always. No exceptions.
+- Define every acronym on first use, even common ones — not every reader shares your context.
+
+WARNINGS:
+- Avoid vague quantifiers: "some," "many," "a few," "several." Be specific. "3 options," not "a few options."
+- Do not use "simply," "just," "easily," or "obviously." If a step were obvious, the reader wouldn't need documentation.
+- Avoid passive voice in procedures: "The file is saved to..." → "The system saves the file to..." or "Save the file to..."
+- Do not document what the UI already shows. Say what to do, not what the screen displays.
+- Avoid future tense in instructions: "You will see a dialog" → "A dialog appears."
+
+STRUCTURE:
+- Every page needs a purpose statement: what task does this page help the reader accomplish?
+- Prerequisites before steps. If the reader needs something, say so before the numbered list.
+- Step → result pattern: describe what to do, then what happens. "Click Submit. The confirmation screen appears."
+- End with what success looks like. How does the reader know they're done?
+- Troubleshooting goes at the bottom, not embedded in the steps.`,
+
+  pr: `PR & Press Release Style Guide
+
+HARD RULES:
+- Lead with the news, not the context. The headline and first sentence carry the story. Everything else supports them.
+- Inverted pyramid structure: most newsworthy information first, supporting detail second, background last.
+- Every claim from a company or spokesperson must be attributed. Floating assertions are not news — they're marketing.
+- Boilerplate goes at the bottom, after the ### (end of release) marker. Never in the body.
+- Dateline on every release: CITY, State, Month DD, YYYY —
+
+WARNINGS:
+- Avoid superlatives and hyperbole: "world-class," "industry-leading," "cutting-edge," "revolutionary," "first-ever" (unless provably true and cited).
+- Quotes must sound like a person said them, not a committee approved them. "We are thrilled to announce this exciting development" — rewrite or cut.
+- Avoid passive voice: "The product was launched" → "[Company] launched the product."
+- No jargon the press won't understand. If a journalist can't use the sentence directly in a story, rewrite it.
+- Do not bury the news. If the most interesting fact is in paragraph four, move it to paragraph one.
+
+STRUCTURE:
+- Headline: news, plain language, no period.
+- Subhead (optional): one sentence expanding the headline.
+- Lead paragraph: the full story in 40 words or fewer. Who, what, when, where, why.
+- Body paragraphs: supporting detail and quotes. Two to four paragraphs maximum.
+- Boilerplate: standard "About [Company]" paragraph. One paragraph, evergreen.
+- Contact info: name, title, email, phone.`,
+
+  executive: `Executive Communications Style Guide
+
+HARD RULES:
+- Lead with the conclusion. Executives read the first sentence. The recommendation, decision, or key finding goes there — not at the end.
+- Be explicit about what you need: a decision, awareness, input, or action. State it in the first paragraph.
+- No throat-clearing. Remove any sentence that could be deleted without changing the meaning of the document.
+- Respect the reader's time. If a memo can be one page, it must be one page.
+- All-hands and company-wide messages must be true. Do not spin, soften, or obscure bad news. Employees can detect it immediately.
+
+WARNINGS:
+- Avoid hedge language unless uncertainty is the actual message: "We believe," "It seems," "Perhaps we should consider." Make a call or acknowledge you cannot yet.
+- No jargon or acronyms without expansion on first use. Not every reader is in your function or level.
+- Avoid passive voice in accountability contexts: "Errors were made" → "We made an error in our projection."
+- Do not use "going forward" or "circle back" or "synergy." These signal that nothing concrete is coming.
+- Avoid motivational filler: "I'm excited about our journey," "Together we can do great things," "Our people are our greatest asset." Say something specific instead.
+
+STRUCTURE:
+- Subject line or title: states the purpose, not the topic. "Q2 Guidance Revised Down 8% — Action Required" not "Q2 Business Update."
+- Opening: the news or decision in one to two sentences.
+- Body: context, rationale, implications. Bullet points for any list of three or more.
+- Close: the specific ask — who needs to do what, by when.
+- No "Please don't hesitate to reach out." Either schedule a meeting or don't.`,
+
   newsletter: `Newsletter & Email Style Guide
 
 HARD RULES:
@@ -576,7 +672,7 @@ STRUCTURE:
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let currentFlags = [];
-let activeExample = 'chuck';
+let activeExample = null;
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -614,7 +710,7 @@ function loadExample(key, save = true) {
 
 function setActiveExample(key) {
   activeExample = key;
-  ['chuck','journalism','business','newsletter'].forEach(k => {
+  ['chuck','journalism','business','newsletter','linkedin','technical','pr','executive'].forEach(k => {
     const btn = document.getElementById('eg-' + k);
     if (btn) btn.className = 'btn-ghost' + (k === key ? ' active' : '');
   });
