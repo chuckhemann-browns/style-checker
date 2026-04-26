@@ -89,12 +89,13 @@
     .check-hint { text-align: center; font-size: 0.72rem; color: var(--text-3); }
 
     /* ── Right panel ── */
-    .right { display: flex; flex-direction: column; overflow-y: auto; }
+    .right { display: flex; flex-direction: column; overflow: hidden; }
 
     /* ── Revised Draft (top of right) ── */
-    .revised-section { display: none; background: var(--surf-2); border-bottom: 2px solid var(--border); flex-shrink: 0; }
-    .revised-section.visible { display: block; }
-    .revised-header { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .revised-section { display: none; background: var(--surf-2); border-bottom: 2px solid var(--border); flex-shrink: 0; transition: box-shadow 0.3s; }
+    .revised-section.visible { display: flex; flex-direction: column; }
+    .revised-section.flash { box-shadow: inset 0 0 0 2px var(--green); }
+    .revised-header { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
     .revised-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; letter-spacing: 2px; color: var(--gold); }
     .revised-hint { font-size: 0.71rem; color: var(--text-3); flex: 1; }
     .revised-export-btns { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -102,12 +103,12 @@
     .btn-export:hover { background: var(--border); color: var(--text); }
     .btn-export.primary { border-color: var(--gold); color: var(--gold); }
     .btn-export.primary:hover { background: rgba(212,175,55,0.1); }
-    #revisedArea { display: block; width: 100%; min-height: 140px; max-height: 260px; background: var(--surface); border: none; border-radius: 0; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.86rem; line-height: 1.65; padding: 12px 20px; resize: vertical; outline: none; transition: box-shadow 0.3s; }
-    #revisedArea.flash { box-shadow: inset 0 0 0 2px var(--green); }
-    #revisedArea.found { box-shadow: inset 0 0 0 2px var(--gold); background: rgba(212,175,55,0.06); }
+    .revised-display { overflow-y: auto; min-height: 100px; max-height: 240px; background: var(--surface); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.86rem; line-height: 1.65; padding: 12px 20px; word-break: break-word; }
+    .revised-display p { margin-bottom: 0.4em; min-height: 1.2em; }
+    .revised-display mark { background: rgba(212,175,55,0.35); color: var(--text); border-radius: 2px; padding: 1px 2px; }
 
     /* ── Results ── */
-    .results-wrap { flex: 1; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .results-wrap { flex: 1; min-height: 0; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
     .results-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.88rem; letter-spacing: 2px; color: var(--red); padding-bottom: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
     .score-bar { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
@@ -264,7 +265,7 @@
           <button class="btn-export primary" onclick="exportDocx()">Download .docx</button>
         </div>
       </div>
-      <textarea id="revisedArea" readonly></textarea>
+      <div id="revisedDisplay" class="revised-display"></div>
     </div>
 
     <!-- Results -->
@@ -726,35 +727,39 @@ function findInDraft(text) {
   const idx = ta.value.toLowerCase().indexOf(text.toLowerCase());
   if (idx === -1) { toast('Not found — may already be changed'); return; }
 
-  const ra      = document.getElementById('revisedArea');
+  // Highlight in the Revised Draft div (reliable, works every time)
   const section = document.getElementById('revisedSection');
-
-  if (ra && section.classList.contains('visible')) {
-    const ridx = ra.value.toLowerCase().indexOf(text.toLowerCase());
-    if (ridx !== -1) {
-      // Scroll the right panel back to top so the Revised Draft is visible
-      const rightPanel = section.parentElement;
-      if (rightPanel) rightPanel.scrollTop = 0;
-
-      // Temporarily remove readonly so setSelectionRange renders a visible highlight
-      ra.removeAttribute('readonly');
-      ra.focus();
-      ra.setSelectionRange(ridx, ridx + text.length);
-      ra.setAttribute('readonly', '');
-
-      // Ratio-based scroll — reliable regardless of line wrapping
-      ra.scrollTop = (ridx / Math.max(1, ra.value.length)) * ra.scrollHeight;
-
-      ra.classList.add('found');
-      setTimeout(() => ra.classList.remove('found'), 1500);
-    }
+  if (section && section.classList.contains('visible')) {
+    highlightInRevised(text);
   }
 
-  // Keep draft textarea in sync for Apply accuracy
-  ta.setSelectionRange(idx, idx + text.length);
+  // Keep draft textarea marked for Apply accuracy
   ta.classList.add('found');
   setTimeout(() => ta.classList.remove('found'), 1500);
   ta.scrollTop = (idx / Math.max(1, ta.value.length)) * ta.scrollHeight;
+}
+
+function highlightInRevised(searchText) {
+  const draft   = document.getElementById('draft').value;
+  const display = document.getElementById('revisedDisplay');
+  if (!display) return;
+
+  const idx = draft.toLowerCase().indexOf(searchText.toLowerCase());
+  if (idx === -1) { syncRevised(); return; }
+
+  const before  = draft.slice(0, idx);
+  const matched = draft.slice(idx, idx + searchText.length);
+  const after   = draft.slice(idx + searchText.length);
+
+  display.innerHTML = (esc(before) + `<mark>${esc(matched)}</mark>` + esc(after))
+    .split('\n')
+    .map(l => `<p>${l || '&nbsp;'}</p>`)
+    .join('');
+
+  const mark = display.querySelector('mark');
+  if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  setTimeout(syncRevised, 2500);
 }
 
 function setLoading(on) {
@@ -780,17 +785,19 @@ function trunc(s, n=110) { s=s.trim(); return s.length>n ? s.slice(0,n).trim()+'
 
 // ── Revised Draft ──────────────────────────────────────────────────────────────
 function syncRevised() {
-  const ra = document.getElementById('revisedArea');
-  if (ra) ra.value = document.getElementById('draft').value;
+  const display = document.getElementById('revisedDisplay');
+  if (!display) return;
+  const text = document.getElementById('draft').value;
+  display.innerHTML = text.split('\n').map(line => `<p>${esc(line) || '&nbsp;'}</p>`).join('');
 }
 
 function flashRevised() {
-  const ra = document.getElementById('revisedArea');
-  if (!ra) return;
-  ra.classList.remove('flash');
-  void ra.offsetWidth;
-  ra.classList.add('flash');
-  setTimeout(() => ra.classList.remove('flash'), 900);
+  const section = document.getElementById('revisedSection');
+  if (!section) return;
+  section.classList.remove('flash');
+  void section.offsetWidth;
+  section.classList.add('flash');
+  setTimeout(() => section.classList.remove('flash'), 900);
 }
 
 function resetTool() {
@@ -799,7 +806,7 @@ function resetTool() {
   document.getElementById('scoreBar').classList.remove('visible');
   document.getElementById('scoreNum').textContent = '0';
   document.getElementById('revisedSection').classList.remove('visible');
-  document.getElementById('revisedArea').value = '';
+  document.getElementById('revisedDisplay').innerHTML = '';
   currentFlags = [];
 }
 
