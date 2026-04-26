@@ -1,97 +1,79 @@
-# Writing Style Enforcement Tools
+# Style Checker: A Writing Style Enforcement Tool
 **Chuck Hemann · April 2026**
 
 ---
 
 ## The Problem
 
-I've been writing the same style guide for four versions. The rules are clear. The violations keep showing up anyway — in AI-drafted content, in first passes, in anything written at speed. The gap isn't knowledge. It's friction. Reviewing a draft against a document is slow, and "slow" means it doesn't happen.
+I've written four versions of my personal writing style guide. The violations kept showing up anyway.
 
-The solution isn't a better style guide. It's removing the friction between the rules and the draft.
+Not because the rules were unclear. Because reviewing a draft against a document is slow, and slow means it doesn't happen. AI-drafted content made this worse. The model knows my voice reasonably well at this point. But "reasonably well" and "right" aren't the same thing. I needed the last mile.
+
+The gap isn't knowledge. It's friction.
+
+---
+
+## The Insight
+
+Most style enforcement tools are built for teams — editorial systems, brand compliance software, workflow integrations. None of that is relevant for a single writer trying to close the gap between their own rules and their own output.
+
+What I needed was simpler: paste a style guide, paste a draft, get violations back in seconds. No account. No installation. No friction between the rules and the writing.
+
+The format constraints mattered. This had to run in a browser, work offline, and not require me to maintain anything. A single HTML file covers all of that.
 
 ---
 
 ## What We Built
 
-Three tools, one purpose: make it faster to write like me than to write like a corporate blog.
+A two-page web application deployed to GitHub Pages. No server. No backend. No login.
 
-### 1. Browser Tool (`index.html`)
+**Landing page (`index.html`)** — explains what the tool does and links to the tool. Clean, brand-consistent, shareable.
 
-A self-contained HTML file. Open in any browser. Paste a draft. Hit Check Style.
+**Tool (`tool.html`)** — the actual checker. Two-panel layout that changes based on state:
 
-No server. No login. No dependencies. Drag to a bookmark bar and it's always there.
+- **Before check:** left panel is inputs (API key, style guide, draft). Right panel is empty.
+- **After check:** left panel disappears. Revised Draft takes the left column. Results take the right.
 
-**What it checks:**
+The Revised Draft panel is the key UX decision. It's not a read-only preview — it's a live document that updates with every fix applied. Export buttons (Copy, .txt, .docx) sit at the top so the last step is fast.
 
-- Em-dashes (hard rule — no exceptions, no format)
-- Soft closes and trailing CTAs
-- Staccato runs (3+ consecutive short sentences)
-- Missing contractions
-- Passive voice in key arguments
-- Buzzwords and over-formal vocabulary
-- Preamble openers
-- Data points without a "so what"
-- Soft CTA language in the body
-
-**How it works:**
-
-Violations are sorted into three tiers: hard rules (must fix), warnings (should fix), suggestions (consider fixing). Every flag shows the offending text, explains why it's a problem, and proposes a specific rewrite. Most have an Apply button that makes the change and re-checks automatically.
-
-The things that can't be auto-applied — staccato runs, data interpretation — require judgment. The tool finds them and shows you what to do. You make the call.
+Results are sorted by severity: hard violations first, warnings second, suggestions third. Each flag shows the violated rule, the offending text, and a specific proposed rewrite. Where the fix is mechanical (em-dash, contraction, filler phrase), there's an Apply button. Where judgment is required (structural rewrites, staccato runs), the tool flags it and proposes a direction. The writer decides.
 
 ---
 
-### 2. CLI Script (`check.js`)
+## Key Decisions
 
-Same checks, terminal output. Useful when drafting in a text editor or when you want to pipe clipboard content through.
+**Any style guide, not just mine.** The tool ships with eight built-in examples — journalism, business, LinkedIn, technical docs, PR, executive communications, newsletter, and my own. Paste your own and it works on that too. The more specific the guide, the more specific the feedback.
 
-```bash
-node check.js draft.txt
-pbpaste | node check.js
-```
+**Severity tiers.** Not all violations are equal. An em-dash is a hard rule. A preamble opener is a warning. A floating data point is a suggestion. Treating them the same flattens the signal. Sorting by severity tells the writer what to fix first.
 
-Color-coded: red for hard rules, gold for warnings, blue for suggestions. Summary line at the end. Fast.
+**Specific rewrites, not principles.** "Avoid passive voice" is useless feedback. "Try: 'We completed the report' instead of 'The report was completed'" is actionable. Every flag in this tool proposes a specific replacement, not a general direction.
 
----
+**Apply where safe, skip where not.** One-click Apply handles mechanical fixes. Structural violations get flagged and explained, but the writer makes the call. Automating the obvious frees up attention for the judgment calls.
 
-### 3. Reusable AI Prompt (`claude-chat-prompt.md`)
-
-A system prompt that turns any AI session — Claude Chat, ChatGPT, Gemini — into a style checker. Paste it as your first message. Paste your draft next. The AI applies the full style guide and flags violations in order of severity.
-
-Useful when you're already in a chat window drafting something and want inline feedback without switching tools.
+**Bring your own API key.** The tool calls the Anthropic API directly from the browser. The key lives in localStorage, never leaves the device. This keeps the tool free, maintenance-free, and private.
 
 ---
 
-## The Thinking
+## Technical Choices
 
-**Rule hierarchy matters.** Not all violations are equal. An em-dash is a hard rule. A preamble opener is a warning. A data point without interpretation is a suggestion. Treating them the same flattens the signal. The tool sorts by severity so you know what to fix first.
+Built as vanilla HTML, CSS, and JavaScript — no framework, no build step, no dependencies. This was a deliberate constraint. A build step means something to maintain. A framework means something to update. Neither is appropriate for a personal tool.
 
-**Specific beats general.** "Avoid passive voice" is useless feedback. "Try: 'Develop your strategy' instead of 'strategies should be developed'" is actionable. Every flag in this tool proposes a specific rewrite, not a principle.
+The Anthropic API call uses `anthropic-dangerous-direct-browser-access: true`, which allows direct browser requests without a proxy server. Appropriate for a personal tool with a local API key; not appropriate for anything with users beyond the owner.
 
-**Apply where safe, find where not.** Some violations have unambiguous fixes — em-dashes, contractions, soft CTAs. The tool applies those in one click. Others require judgment — merging staccato sentences, writing a "so what," reframing a question as a statement. The tool finds those and proposes a direction. The writer decides.
+Export to `.docx` is handled by JSZip constructing raw Open XML in the browser — no server-side generation, no external service. It's minimal but correct: paragraphs, spacing, and encoding. Enough for Word and Google Docs to open cleanly.
 
-**Three tools for three contexts.** The browser tool is for intentional review. The CLI is for fast terminal checks. The prompt is for AI-assisted drafting. Same rules, different surfaces. Pick whichever has the least friction at the moment.
-
----
-
-## The Rules Behind the Tool
-
-The full source is the *Chuck Hemann Writing Style Guide v4* (April 2026). The tool enforces the mechanical rules — the ones that can be detected with pattern matching. The harder rules (peer-to-peer reader assumption, pressure-then-release rhythm, closing declaratively) still require a human read.
-
-The checklist at the end of the style guide is the final gate. The tool handles the scan. The checklist handles the judgment.
+Deployed to GitHub Pages. The repository is public at `chuckhemann-browns.github.io/style-checker`. Social sharing uses a custom OG image generated from the brand design and embedded via meta tags.
 
 ---
 
-## What's Not Here
+## The Outcome
 
-These violations exist in the style guide but aren't in the tool yet:
+A tool I use every time I check a draft before publishing. The mechanical violations — em-dashes, staccato runs, filler phrases, soft closes — get caught before a human read. The time between "done writing" and "clean draft" dropped from twenty minutes of careful re-reading to about ninety seconds.
 
-- **Pop culture references not connected back to the business point** — requires semantic understanding
-- **Numbered frameworks with no connective tissue** — structural, not pattern-detectable
-- **Writing for a student, not a peer** — tone judgment, not a string match
+The harder violations (peer-to-peer register, pressure-release rhythm, declarative close) still require judgment. The tool handles the scan. The writer handles the read.
 
-A future version could route flagged drafts through the Claude API for semantic checks. The mechanical layer is solid. The judgment layer is next.
+That division of labor is what makes it work.
 
 ---
 
-*Built with Claude Code · Style Guide v4*
+*Built with Claude Code · April 2026 · [chuckhemann-browns.github.io/style-checker](https://chuckhemann-browns.github.io/style-checker)*
