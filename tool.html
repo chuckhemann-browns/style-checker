@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Style Checker — Tool</title>
+  <meta name="description" content="Paste your style guide. Paste your draft. Get violations, proposed rewrites, and one-click fixes — powered by Claude.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:    #0a1628;
+      --navy-2:  #0d1e38;
+      --surface: #0f2040;
+      --surf-2:  #132848;
+      --border:  #1e3a5a;
+      --bord-2:  #2a4e70;
+      --gold:    #d4af37;
+      --gold-2:  #e8c84a;
+      --red:     #e23c52;
+      --red-2:   #f04e64;
+      --green:   #3db87a;
+      --blue:    #4a9fd4;
+      --text:    #eaf2ff;
+      --text-2:  #7a9bbf;
+      --text-3:  #3d5a78;
+    }
+    html { font-size: 16px; }
+    body { background: var(--navy); color: var(--text); font-family: 'Outfit', sans-serif; font-weight: 400; line-height: 1.6; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    .topbar { height: 5px; background: linear-gradient(90deg, var(--gold) 0%, var(--red) 50%, var(--gold) 100%); flex-shrink: 0; }
+
+    .nav { background: rgba(10,22,40,0.97); border-bottom: 1px solid var(--border); padding: 12px 32px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .nav-logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 3px; color: var(--text); text-decoration: none; }
+    .nav-logo span { color: var(--gold); }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .nav-link { font-size: 0.8rem; color: var(--text-2); text-decoration: none; transition: color 0.2s; }
+    .nav-link:hover { color: var(--gold); }
+
+    /* ── Tool layout ── */
+    #tool { flex: 1; display: grid; grid-template-columns: 400px 1fr; min-height: 0; }
+
+    /* ── Left panel ── */
+    .left { border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--navy-2); overflow-y: auto; }
+    .input-block { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 9px; }
+    .block-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .block-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.9rem; letter-spacing: 2px; color: var(--gold); }
+    .block-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+    .key-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.84rem; padding: 8px 12px; outline: none; transition: border-color 0.18s; }
+    .key-input:focus { border-color: var(--gold); }
+    .key-input::placeholder { color: var(--text-3); }
+    .api-pill { display: flex; align-items: center; gap: 7px; background: var(--surf-2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px 4px 8px; flex-shrink: 0; }
+    .api-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); transition: background 0.2s, box-shadow 0.2s; }
+    .api-dot.connected { background: var(--green); box-shadow: 0 0 7px rgba(61,184,122,0.5); }
+    .api-dot.invalid { background: var(--red); }
+    .api-pill-text { font-size: 0.74rem; color: var(--text-2); white-space: nowrap; }
+    .key-hint { font-size: 0.73rem; color: var(--text-3); line-height: 1.5; }
+    .key-hint a { color: var(--gold); opacity: 0.8; text-decoration: none; }
+    .key-hint a:hover { opacity: 1; }
+
+    .examples-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .examples-label { font-size: 0.72rem; color: var(--text-3); white-space: nowrap; }
+
+    textarea { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.86rem; line-height: 1.65; padding: 10px 13px; resize: vertical; outline: none; transition: border-color 0.18s, box-shadow 0.18s; }
+    textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.07); }
+    textarea::placeholder { color: var(--text-3); font-size: 0.82rem; }
+    #styleGuide { min-height: 130px; }
+    #draft { min-height: 180px; }
+    textarea.found { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.2); }
+
+    .btn-ghost { font-family: 'Outfit', sans-serif; font-size: 0.71rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surf-2); color: var(--text-2); transition: background 0.18s, color 0.18s; white-space: nowrap; }
+    .btn-ghost:hover { background: var(--border); color: var(--text); }
+    .btn-ghost.active { background: var(--border); color: var(--gold); border-color: var(--gold); }
+    .btn-upload { font-family: 'Outfit', sans-serif; font-size: 0.71rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surf-2); color: var(--text-2); transition: background 0.18s; display: inline-block; white-space: nowrap; }
+    .btn-upload:hover { background: var(--border); color: var(--text); }
+    .btn-upload input { display: none; }
+
+    .check-block { padding: 14px 20px 18px; border-top: 1px solid var(--border); margin-top: auto; display: flex; flex-direction: column; gap: 7px; }
+    .btn-check { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 2px; background: var(--red); color: #fff; border: none; border-radius: 7px; padding: 11px 24px; cursor: pointer; width: 100%; transition: background 0.18s, transform 0.1s; }
+    .btn-check:hover:not(:disabled) { background: var(--red-2); }
+    .btn-check:active:not(:disabled) { transform: scale(0.99); }
+    .btn-check:disabled { opacity: 0.45; cursor: not-allowed; }
+    .check-hint { text-align: center; font-size: 0.72rem; color: var(--text-3); }
+
+    /* ── Right panel ── */
+    .right { display: flex; flex-direction: column; overflow-y: auto; }
+
+    /* ── Revised Draft (top of right) ── */
+    .revised-section { display: none; background: var(--surf-2); border-bottom: 2px solid var(--border); flex-shrink: 0; }
+    .revised-section.visible { display: block; }
+    .revised-header { display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .revised-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; letter-spacing: 2px; color: var(--gold); }
+    .revised-hint { font-size: 0.71rem; color: var(--text-3); flex: 1; }
+    .revised-export-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-export { font-family: 'Outfit', sans-serif; font-size: 0.71rem; font-weight: 600; padding: 4px 11px; border-radius: 4px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surface); color: var(--text-2); transition: background 0.18s, color 0.18s; white-space: nowrap; }
+    .btn-export:hover { background: var(--border); color: var(--text); }
+    .btn-export.primary { border-color: var(--gold); color: var(--gold); }
+    .btn-export.primary:hover { background: rgba(212,175,55,0.1); }
+    #revisedArea { display: block; width: 100%; min-height: 140px; max-height: 260px; background: var(--surface); border: none; border-radius: 0; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.86rem; line-height: 1.65; padding: 12px 20px; resize: vertical; outline: none; transition: box-shadow 0.3s; }
+    #revisedArea.flash { box-shadow: inset 0 0 0 2px var(--green); }
+
+    /* ── Results ── */
+    .results-wrap { flex: 1; padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .results-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.88rem; letter-spacing: 2px; color: var(--red); padding-bottom: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+    .score-bar { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+    .score-bar.visible { display: block; }
+    .score-top { display: flex; align-items: center; gap: 14px; padding: 14px 18px 10px; }
+    .score-num { font-family: 'Bebas Neue', sans-serif; font-size: 3.2rem; line-height: 1; min-width: 50px; }
+    .score-verdict { font-weight: 700; font-size: 0.92rem; }
+    .score-detail { font-size: 0.75rem; color: var(--text-2); margin-top: 2px; }
+    .score-summary { font-size: 0.81rem; color: var(--text-2); font-style: italic; line-height: 1.55; padding: 10px 18px 13px; border-top: 1px solid var(--border); }
+
+    .section-head { font-family: 'Bebas Neue', sans-serif; font-size: 0.76rem; letter-spacing: 2px; color: var(--text-3); margin: 14px 0 7px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+    .section-head:first-child { margin-top: 0; }
+
+    .flag { border-radius: 7px; border-left: 3px solid; overflow: hidden; margin-bottom: 9px; transition: box-shadow 0.18s; }
+    .flag:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .flag.applied { opacity: 0.4; }
+    .flag.error { border-color: var(--red);  background: rgba(226,60,82,0.07); }
+    .flag.warn  { border-color: var(--gold); background: rgba(212,175,55,0.07); }
+    .flag.info  { border-color: var(--blue); background: rgba(74,159,212,0.07); }
+    .flag-body { padding: 10px 13px; }
+    .flag-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 3px; }
+    .flag-title { font-weight: 600; font-size: 0.86rem; flex: 1; line-height: 1.4; }
+    .flag.error .flag-title { color: var(--red); }
+    .flag.warn  .flag-title { color: var(--gold); }
+    .flag.info  .flag-title { color: var(--blue); }
+    .flag-btns { display: flex; gap: 5px; flex-shrink: 0; }
+    .flag-rule { font-size: 0.71rem; color: var(--text-3); font-style: italic; margin-bottom: 3px; }
+    .flag-detail { font-size: 0.81rem; color: var(--text-2); line-height: 1.5; }
+    .flag-quote { margin-top: 6px; font-size: 0.78rem; color: var(--text-3); font-style: italic; word-break: break-word; }
+
+    .btn-find { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surf-2); color: var(--blue); white-space: nowrap; transition: background 0.15s; }
+    .btn-find:hover { background: rgba(74,159,212,0.12); }
+
+    .suggestion { display: flex; align-items: flex-start; gap: 10px; padding: 9px 13px; background: rgba(5,14,28,0.5); border-top: 1px solid rgba(61,184,122,0.12); }
+    .sug-tag { font-family: 'Bebas Neue', sans-serif; font-size: 0.71rem; letter-spacing: 1px; color: var(--green); flex-shrink: 0; padding-top: 2px; }
+    .sug-text { flex: 1; font-size: 0.80rem; color: #9ecfb8; line-height: 1.55; word-break: break-word; }
+    .btn-apply { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(61,184,122,0.25); background: rgba(61,184,122,0.1); color: var(--green); white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
+    .btn-apply:hover:not(:disabled) { background: rgba(61,184,122,0.2); }
+    .btn-apply:disabled { opacity: 0.35; cursor: default; }
+
+    .empty-state { color: var(--text-3); font-size: 0.87rem; line-height: 2; padding: 48px 0; text-align: center; }
+    .all-clear { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .all-clear-n { font-family: 'Bebas Neue', sans-serif; font-size: 5rem; color: var(--green); line-height: 1; letter-spacing: 3px; }
+    .all-clear-sub { font-size: 0.87rem; color: var(--text-2); }
+    .loading { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 60px 20px; }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 0.84rem; color: var(--text-2); }
+    .error-box { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 20px; text-align: center; }
+    .error-icon { font-size: 2rem; }
+    .error-msg { font-size: 0.86rem; color: var(--text-2); max-width: 360px; line-height: 1.6; }
+
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px); background: var(--surf-2); color: var(--green); border: 1px solid rgba(61,184,122,0.28); border-radius: 6px; padding: 9px 20px; font-size: 0.85rem; font-weight: 600; opacity: 0; pointer-events: none; z-index: 999; transition: opacity 0.2s, transform 0.2s; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .footer { border-top: 1px solid var(--border); background: var(--navy-2); padding: 11px 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-shrink: 0; }
+    .footer-l { font-family: 'Bebas Neue', sans-serif; font-size: 0.8rem; letter-spacing: 1px; color: var(--text-3); }
+    .footer-l span { color: var(--gold); }
+    .footer-r { font-size: 0.72rem; color: var(--text-3); }
+    .footer-r a { color: var(--text-3); text-decoration: none; }
+    .footer-r a:hover { color: var(--gold); }
+
+    @media (max-width: 900px) {
+      body { overflow: auto; height: auto; }
+      #tool { grid-template-columns: 1fr; }
+      .left { border-right: none; border-bottom: 1px solid var(--border); }
+      .right { min-height: 600px; }
+      .nav { padding: 10px 16px; }
+      .footer { padding: 11px 16px; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar"></div>
+
+<nav class="nav">
+  <a href="index.html" class="nav-logo">Style <span>Checker</span></a>
+  <div class="nav-right">
+    <a href="index.html" class="nav-link">&#8592; Home</a>
+    <a href="https://github.com/chuckhemann-browns/style-checker" target="_blank" class="nav-link">GitHub</a>
+  </div>
+</nav>
+
+<div id="tool">
+
+  <!-- Left: inputs -->
+  <div class="left">
+
+    <!-- API Key -->
+    <div class="input-block">
+      <div class="block-header">
+        <div class="block-label">API Key</div>
+        <div class="api-pill">
+          <div class="api-dot" id="apiDot"></div>
+          <span class="api-pill-text" id="apiPillText">No key</span>
+        </div>
+      </div>
+      <input class="key-input" type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <div class="key-hint">Stored in your browser only. <a href="https://console.anthropic.com" target="_blank">Get a free key →</a></div>
+    </div>
+
+    <!-- Style Guide -->
+    <div class="input-block">
+      <div class="block-header">
+        <div class="block-label">Style Guide</div>
+        <div class="block-actions">
+          <label class="btn-upload">Upload<input type="file" id="guideUpload" accept=".txt,.md"></label>
+        </div>
+      </div>
+      <div class="examples-row">
+        <span class="examples-label">Examples:</span>
+        <button class="btn-ghost" id="eg-chuck" onclick="loadExample('chuck')">Chuck Hemann — April 2026</button>
+        <button class="btn-ghost" id="eg-journalism" onclick="loadExample('journalism')">Journalism</button>
+        <button class="btn-ghost" id="eg-business" onclick="loadExample('business')">Business</button>
+        <button class="btn-ghost" id="eg-newsletter" onclick="loadExample('newsletter')">Newsletter</button>
+        <button class="btn-ghost" id="eg-linkedin" onclick="loadExample('linkedin')">LinkedIn</button>
+        <button class="btn-ghost" id="eg-technical" onclick="loadExample('technical')">Technical & Docs</button>
+        <button class="btn-ghost" id="eg-pr" onclick="loadExample('pr')">PR & Press Release</button>
+        <button class="btn-ghost" id="eg-executive" onclick="loadExample('executive')">Executive Comms</button>
+      </div>
+      <textarea id="styleGuide" placeholder="Paste your style guide — voice, rules, vocabulary, structure, tone. The more specific, the better." spellcheck="false"></textarea>
+    </div>
+
+    <!-- Draft -->
+    <div class="input-block">
+      <div class="block-header">
+        <div class="block-label">Draft</div>
+        <div class="block-actions">
+          <label class="btn-upload">Upload<input type="file" id="draftUpload" accept=".txt,.md"></label>
+        </div>
+      </div>
+      <textarea id="draft" placeholder="Paste your draft — blog post, LinkedIn post, newsletter, chapter, anything."></textarea>
+    </div>
+
+    <!-- Check -->
+    <div class="check-block">
+      <button class="btn-check" id="checkBtn" onclick="runCheck()">Check Style</button>
+      <div class="check-hint">Cmd + Enter &middot; Results appear on the right</div>
+    </div>
+  </div>
+
+  <!-- Right: revised draft + results -->
+  <div class="right">
+
+    <!-- Revised Draft — appears at top after first check -->
+    <div class="revised-section" id="revisedSection">
+      <div class="revised-header">
+        <div class="revised-label">Revised Draft</div>
+        <div class="revised-hint">Updates as you apply fixes</div>
+        <div class="revised-export-btns">
+          <button class="btn-export" onclick="copyDraft()">Copy</button>
+          <button class="btn-export" onclick="exportTxt()">Download .txt</button>
+          <button class="btn-export primary" onclick="exportDocx()">Download .docx</button>
+        </div>
+      </div>
+      <textarea id="revisedArea" readonly></textarea>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap">
+      <div class="results-label">Results</div>
+      <div class="score-bar" id="scoreBar">
+        <div class="score-top">
+          <div class="score-num" id="scoreNum">0</div>
+          <div>
+            <div class="score-verdict" id="scoreVerdict"></div>
+            <div class="score-detail"  id="scoreDetail"></div>
+          </div>
+        </div>
+        <div class="score-summary" id="scoreSummary"></div>
+      </div>
+      <div id="results">
+        <div class="empty-state">
+          Paste your style guide and draft on the left.<br>
+          Hit Check Style.<br>
+          Violations appear here, sorted by severity.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="footer-l"><span>Style Checker</span> &middot; v1.0</div>
+  <div class="footer-r">
+    <a href="https://github.com/chuckhemann-browns/style-checker" target="_blank">View on GitHub</a>
+    &middot; Built with Claude Sonnet
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const EXAMPLES = {
+  chuck: `Chuck Hemann Writing Style Guide v4
+
+HARD RULES — must fix, no exceptions:
+- No em-dashes (—). Ever. Any format. Replace with a comma, period, or parentheses.
+- Close declaratively. The final sentence must be a statement. No questions, no soft CTAs ("feel free to share," "let me know your thoughts," "what do you think?").
+- No staccato runs. Never 3 or more consecutive short sentences (under ~10 words each). Short sentences need setup to land — without contrast, it's choppiness.
+- Use contractions throughout (don't, it's, you're, we've). Formal constructions (do not, it is, they are) kill the conversational register.
+
+WARNINGS — should fix:
+- No passive voice in key arguments. Rewrite as active. ("Strategies should be developed" → "Develop your strategy.")
+- No buzzwords or over-formal vocabulary: utilize, leverage, facilitate, synergy, paradigm, holistic, going forward, circle back, touch base, move the needle, best practices, deep dive, low-hanging fruit, actionable insights, impactful, scalable, robust solution.
+- No preamble openers. Flag openers like "In today's fast-paced world," "As many of us know," "It's no secret that." If the point lands without the opener, cut it.
+- Data points need a "so what." Every stat or data cite needs interpretation. Never leave data floating without a takeaway.
+- No soft CTA language anywhere in the piece ("feel free to," "don't hesitate," "share your thoughts").
+
+VOICE RULES:
+- Write peer-to-peer. Don't explain terms your reader already knows professionally.
+- Sentence rhythm: build context in a longer sentence, then land with a short one that crystallizes — not adds — information.
+- Direct address: talk to the reader directly and frequently ("you," "we").
+- Organize around numbered frameworks where possible.
+- Pop culture references must connect back to the business point in one sentence. Never left floating.
+- Parentheses over em-dashes for elaboration, humor, and qualifications.`,
+
+  journalism: `Journalism Style Guide (AP-Influenced)
+
+HARD RULES:
+- Inverted pyramid structure: most important information first. Every story must lead with the who, what, when, where, why.
+- Attribution is required for every claim not common knowledge. "According to," "said," "[Name] confirmed" — not floating assertions.
+- No opinion or editorializing unless it is a clearly labeled column or op-ed. Stick to verifiable fact.
+- Spell out numbers one through nine. Use numerals for 10 and above.
+- Ages always use numerals: "She is 34." Titles are abbreviated after a name: Sen., Rep., Gov.
+
+WARNINGS:
+- Avoid adverbs, especially intensifiers: "very," "extremely," "incredibly," "highly." These weaken copy.
+- Avoid weasel words: "some say," "many believe," "experts suggest" — without named sources, cut it.
+- Passive voice obscures who did what. Rewrite: "The bill was passed" → "The Senate passed the bill."
+- Avoid jargon the general reader won't know. If you must use a term, define it on first use.
+- Quotes must be exact. Paraphrase with attribution if you cannot verify exact wording.
+- Keep sentences under 30 words. If a sentence needs two commas and a semicolon, split it.
+
+STRUCTURE:
+- Lead paragraph: one to two sentences. No longer.
+- Each paragraph: one idea. Three sentences maximum.
+- Transition between paragraphs with the next most important detail, not a connector phrase.
+- End on a fact, quote, or detail — not a summary or conclusion.`,
+
+  business: `Business Writing Style Guide
+
+HARD RULES:
+- Lead with the recommendation. Executives read the first sentence. Put the ask, decision, or conclusion there — not at the end.
+- One idea per paragraph. Do not stack multiple points into a single block.
+- No passive voice. "The report was completed" → "We completed the report." The actor matters in business writing.
+- Numbers over words for quantities: "3 options," not "three options." Exception: starting a sentence.
+- Use bullet points for any list of three or more items. Do not bury lists in prose.
+
+WARNINGS:
+- No corporate filler: "as per," "going forward," "circle back," "touch base," "move the needle," "synergies," "leverage," "utilize," "best practices," "deep dive," "action items," "bandwidth," "boil the ocean." Say what you mean plainly.
+- No hedging without reason: "It seems like," "It might be worth considering," "Perhaps we should." Make a call.
+- Avoid qualifiers unless the qualification matters: "fairly," "somewhat," "quite," "rather," "a bit."
+- Acronyms must be spelled out on first use, even familiar ones. Not every reader is in your function.
+- Avoid nominalizations: "make a decision" → "decide." "Have a discussion" → "discuss."
+
+STRUCTURE:
+- Subject line or header must state the purpose, not describe it. "Q3 Budget Approval Needed" not "Q3 Budget Update."
+- If the document is longer than one page, include a summary at the top.
+- Close with a clear next step: who does what by when. Never close with an open question.`,
+
+  linkedin: `LinkedIn & Thought Leadership Style Guide
+
+HARD RULES:
+- Open with a hook, not a preamble. The first line must earn the scroll stop. "In today's competitive landscape..." is an auto-scroll. Start with a specific observation, a contrarian claim, or a number that surprises.
+- No walls of text. Every 2-3 sentences, hit return. White space is structure on LinkedIn.
+- Close declaratively. Your final line is a position, not a question. "What do you think?" and "Would love your thoughts" are soft closes — cut them.
+- One idea per post. LinkedIn posts that try to make three points make zero.
+
+WARNINGS:
+- No corporate buzzwords: synergy, leverage, utilize, circle back, move the needle, best practices, thought leader, game-changer, disruptive, scalable, ecosystem, space (as in "in the [X] space").
+- Avoid the false story open: "I was sitting in a meeting when it hit me..." — only works if the story leads directly to a non-obvious insight.
+- Do not ask engagement-bait questions at the end: "Drop a comment below," "Tag someone who needs to hear this," "Double tap if you agree."
+- No passive voice. LinkedIn rewards confidence. "Mistakes were made" → "We made a mistake."
+- Avoid humble-brag framing: "Humbled and honored to share..." Just share it.
+
+STRUCTURE:
+- Line 1: the hook — a claim, stat, or observation. No setup.
+- Lines 2-5: the tension or context. Why does this matter right now?
+- Lines 6-10: the insight, framework, or takeaway. Numbered lists work well here.
+- Final line: a declaration. Your position, stated plainly.
+- No sign-off. No "- [Name]". Your name is already on the post.`,
+
+  technical: `Technical Writing & Documentation Style Guide
+
+HARD RULES:
+- Write for the person trying to accomplish a task, not the person trying to understand a system. Every sentence should move the reader closer to completing something.
+- Use imperative voice for instructions: "Click Save," not "You should click Save" or "The user clicks Save."
+- One step per numbered item. Never combine two actions in one step.
+- Code, commands, file names, and UI labels go in code formatting. Always. No exceptions.
+- Define every acronym on first use, even common ones — not every reader shares your context.
+
+WARNINGS:
+- Avoid vague quantifiers: "some," "many," "a few," "several." Be specific. "3 options," not "a few options."
+- Do not use "simply," "just," "easily," or "obviously." If a step were obvious, the reader wouldn't need documentation.
+- Avoid passive voice in procedures: "The file is saved to..." → "The system saves the file to..." or "Save the file to..."
+- Do not document what the UI already shows. Say what to do, not what the screen displays.
+- Avoid future tense in instructions: "You will see a dialog" → "A dialog appears."
+
+STRUCTURE:
+- Every page needs a purpose statement: what task does this page help the reader accomplish?
+- Prerequisites before steps. If the reader needs something, say so before the numbered list.
+- Step → result pattern: describe what to do, then what happens. "Click Submit. The confirmation screen appears."
+- End with what success looks like. How does the reader know they're done?
+- Troubleshooting goes at the bottom, not embedded in the steps.`,
+
+  pr: `PR & Press Release Style Guide
+
+HARD RULES:
+- Lead with the news, not the context. The headline and first sentence carry the story. Everything else supports them.
+- Inverted pyramid structure: most newsworthy information first, supporting detail second, background last.
+- Every claim from a company or spokesperson must be attributed. Floating assertions are not news — they're marketing.
+- Boilerplate goes at the bottom, after the ### (end of release) marker. Never in the body.
+- Dateline on every release: CITY, State, Month DD, YYYY —
+
+WARNINGS:
+- Avoid superlatives and hyperbole: "world-class," "industry-leading," "cutting-edge," "revolutionary," "first-ever" (unless provably true and cited).
+- Quotes must sound like a person said them, not a committee approved them. "We are thrilled to announce this exciting development" — rewrite or cut.
+- Avoid passive voice: "The product was launched" → "[Company] launched the product."
+- No jargon the press won't understand. If a journalist can't use the sentence directly in a story, rewrite it.
+- Do not bury the news. If the most interesting fact is in paragraph four, move it to paragraph one.
+
+STRUCTURE:
+- Headline: news, plain language, no period.
+- Subhead (optional): one sentence expanding the headline.
+- Lead paragraph: the full story in 40 words or fewer. Who, what, when, where, why.
+- Body paragraphs: supporting detail and quotes. Two to four paragraphs maximum.
+- Boilerplate: standard "About [Company]" paragraph. One paragraph, evergreen.
+- Contact info: name, title, email, phone.`,
+
+  executive: `Executive Communications Style Guide
+
+HARD RULES:
+- Lead with the conclusion. Executives read the first sentence. The recommendation, decision, or key finding goes there — not at the end.
+- Be explicit about what you need: a decision, awareness, input, or action. State it in the first paragraph.
+- No throat-clearing. Remove any sentence that could be deleted without changing the meaning of the document.
+- Respect the reader's time. If a memo can be one page, it must be one page.
+- All-hands and company-wide messages must be true. Do not spin, soften, or obscure bad news. Employees can detect it immediately.
+
+WARNINGS:
+- Avoid hedge language unless uncertainty is the actual message: "We believe," "It seems," "Perhaps we should consider." Make a call or acknowledge you cannot yet.
+- No jargon or acronyms without expansion on first use. Not every reader is in your function or level.
+- Avoid passive voice in accountability contexts: "Errors were made" → "We made an error in our projection."
+- Do not use "going forward" or "circle back" or "synergy." These signal that nothing concrete is coming.
+- Avoid motivational filler: "I'm excited about our journey," "Together we can do great things," "Our people are our greatest asset." Say something specific instead.
+
+STRUCTURE:
+- Subject line or title: states the purpose, not the topic. "Q2 Guidance Revised Down 8% — Action Required" not "Q2 Business Update."
+- Opening: the news or decision in one to two sentences.
+- Body: context, rationale, implications. Bullet points for any list of three or more.
+- Close: the specific ask — who needs to do what, by when.
+- No "Please don't hesitate to reach out." Either schedule a meeting or don't.`,
+
+  newsletter: `Newsletter & Email Style Guide
+
+HARD RULES:
+- Subject line is copy, not a label. It must earn the open. No "Monthly Update" or "Newsletter #14." Write a hook.
+- Open with the most interesting thing. The first sentence determines whether they keep reading. No warmup.
+- Paragraphs are three sentences maximum. In email, white space is your friend. Use it.
+- One clear call to action per email. Not three. Not five. One.
+- No passive voice. No one has time to decode who did what.
+
+WARNINGS:
+- No throat-clearing: "Hope this finds you well," "As the year comes to a close," "We wanted to reach out." Get to the point.
+- Avoid "click here" as link text. The link text should describe where the link goes.
+- Do not use ALL CAPS for emphasis. Bold the specific word or phrase instead.
+- Keep sentences under 20 words where possible. Long sentences break in mobile clients.
+- Avoid insider jargon. Your list has different expertise levels. Write for the least familiar person who would reasonably subscribe.
+- No "per my last email" or passive-aggressive phrasing. Be direct about what you need.
+
+STRUCTURE:
+- First paragraph: hook — one or two sentences. Why should they read this today?
+- Body: the point, with necessary context. No tangents. No recaps of last issue.
+- Close: one sentence naming the next step, followed by the CTA.
+- Sign-off: first name only, or brand name. No "Best regards," no "Sincerely." Too formal.`
+};
+
+let currentFlags = [];
+let activeExample = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const savedKey   = localStorage.getItem('sc_key');
+  const savedGuide = localStorage.getItem('sc_guide');
+  const savedEx    = localStorage.getItem('sc_example');
+
+  if (savedKey) document.getElementById('apiKey').value = savedKey;
+
+  if (savedGuide) {
+    document.getElementById('styleGuide').value = savedGuide;
+    setActiveExample(null);
+  } else if (savedEx) {
+    loadExample(savedEx, false);
+  }
+
+  document.getElementById('apiKey').addEventListener('input', updateApiStatus);
+  document.getElementById('guideUpload').addEventListener('change', e => loadFile(e, 'styleGuide', true));
+  document.getElementById('draftUpload').addEventListener('change', e => loadFile(e, 'draft', false));
+  document.getElementById('draft').addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runCheck();
+  });
+  updateApiStatus();
+});
+
+function loadExample(key, save = true) {
+  document.getElementById('styleGuide').value = EXAMPLES[key] || '';
+  setActiveExample(key);
+  if (save) {
+    localStorage.setItem('sc_example', key);
+    localStorage.removeItem('sc_guide');
+  }
+}
+
+function setActiveExample(key) {
+  activeExample = key;
+  ['chuck','journalism','business','newsletter','linkedin','technical','pr','executive'].forEach(k => {
+    const btn = document.getElementById('eg-' + k);
+    if (btn) btn.className = 'btn-ghost' + (k === key ? ' active' : '');
+  });
+}
+
+function loadFile(e, targetId, isGuide) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById(targetId).value = ev.target.result;
+    if (isGuide) { setActiveExample(null); localStorage.setItem('sc_guide', ev.target.result); }
+    toast(`${file.name} loaded`);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function updateApiStatus() {
+  const key  = document.getElementById('apiKey').value.trim();
+  const dot  = document.getElementById('apiDot');
+  const text = document.getElementById('apiPillText');
+  if (key.startsWith('sk-ant-') && key.length > 20) {
+    dot.className = 'api-dot connected'; text.textContent = 'Key set';
+  } else if (key.length > 0) {
+    dot.className = 'api-dot invalid'; text.textContent = 'Invalid';
+  } else {
+    dot.className = 'api-dot'; text.textContent = 'No key';
+  }
+}
+
+const SYSTEM = `You are an expert writing style editor. The user provides their style guide and a draft.
+
+Your job:
+1. Read the style guide — understand every rule, preference, and prohibition.
+2. Review the draft for violations.
+3. Return ONLY a valid JSON object — no markdown fences, no prose outside JSON.
+
+JSON format:
+{
+  "summary": "One honest sentence on the draft overall.",
+  "word_count": <integer>,
+  "flags": [
+    {
+      "level": "error|warn|info",
+      "rule": "Rule name from the style guide",
+      "title": "Specific violation title",
+      "detail": "Why this violates the style guide — specific, not generic.",
+      "quote": "Exact offending text from the draft (verbatim substring, max 120 chars).",
+      "suggestion": "Specific proposed rewrite — actual replacement text, not vague advice.",
+      "original": "Exact substring from draft for auto-replace (verbatim). Null if structural.",
+      "replacement": "Drop-in replacement string. Null if structural or requires judgment."
+    }
+  ]
+}
+
+Rules: error = hard rule. warn = should fix. info = worth considering.
+original must be copied EXACTLY from the draft. replacement must be a grammatically correct drop-in swap.
+If a fix requires rewriting a full sentence, set original and replacement to null.
+Max 15 flags, prioritized by severity. Return ONLY the JSON object.`;
+
+async function runCheck() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const guide  = document.getElementById('styleGuide').value.trim();
+  const draft  = document.getElementById('draft').value.trim();
+
+  if (!apiKey) { showError('Enter your Anthropic API key to get started.'); return; }
+  if (!guide)  { showError('Add a style guide — use an example or paste your own.'); return; }
+  if (!draft)  { showError('Add a draft to check.'); return; }
+
+  setLoading(true);
+  document.getElementById('scoreBar').classList.remove('visible');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        system: SYSTEM,
+        messages: [{ role: 'user', content: `STYLE GUIDE:\n\n${guide}\n\n${'─'.repeat(40)}\n\nDRAFT:\n\n${draft}` }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const status = res.status;
+      if (status === 401) throw new Error('Invalid API key. Double-check your key at console.anthropic.com.');
+      if (status === 429) throw new Error('Rate limit hit. Wait a few seconds and try again — or check your usage at console.anthropic.com.');
+      if (status === 529 || status === 503) throw new Error('Anthropic API is overloaded right now. Wait 30 seconds and try again.');
+      if (status >= 500) throw new Error(`Anthropic API error (${status}). This is on their end — try again in a moment.`);
+      throw new Error(err.error?.message || `API error ${status}`);
+    }
+
+    const data  = await res.json();
+    const raw   = (data.content?.[0]?.text || '').replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('The model returned an unexpected response. Try again — this is usually a one-off.');
+
+    let result;
+    try { result = JSON.parse(match[0]); }
+    catch { throw new Error('Could not parse the response. Try again — this is usually a one-off.'); }
+
+    currentFlags = result.flags || [];
+    render(result, draft);
+    localStorage.setItem('sc_key', apiKey);
+
+  } catch (err) {
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      showError('Network error — check your internet connection and try again.');
+    } else {
+      showError(err.message);
+    }
+  } finally {
+    setLoading(false);
+  }
+}
+
+function render(result, draft) {
+  const flags  = result.flags || [];
+  const errors = flags.filter(f => f.level === 'error');
+  const warns  = flags.filter(f => f.level === 'warn');
+  const infos  = flags.filter(f => f.level === 'info');
+  const wc     = result.word_count || draft.split(/\s+/).filter(Boolean).length;
+
+  const scoreBar = document.getElementById('scoreBar');
+  const scoreNum = document.getElementById('scoreNum');
+  const verdict  = document.getElementById('scoreVerdict');
+  const detail   = document.getElementById('scoreDetail');
+  const summary  = document.getElementById('scoreSummary');
+  const results  = document.getElementById('results');
+
+  scoreBar.classList.add('visible');
+  scoreNum.textContent = flags.length;
+
+  if (!flags.length) {
+    scoreNum.style.color = verdict.style.color = 'var(--green)';
+    verdict.textContent = 'Clean';
+  } else if (errors.length) {
+    scoreNum.style.color = verdict.style.color = 'var(--red)';
+    verdict.textContent = `${errors.length} hard violation${errors.length > 1 ? 's' : ''}`;
+  } else {
+    scoreNum.style.color = verdict.style.color = 'var(--gold)';
+    verdict.textContent = 'Review needed';
+  }
+
+  detail.textContent  = `${flags.length} flag${flags.length !== 1 ? 's' : ''} · ${wc} words`;
+  summary.textContent = result.summary || '';
+
+  syncRevised();
+  document.getElementById('revisedSection').classList.add('visible');
+
+  if (!flags.length) {
+    results.innerHTML = `<div class="all-clear"><div class="all-clear-n">0</div><div class="all-clear-sub">${wc} words. No violations found.</div></div>`;
+    return;
+  }
+
+  let html = '';
+  if (errors.length) { html += `<div class="section-head">Hard Rules (${errors.length})</div>`; errors.forEach(f => { html += card(f, flags.indexOf(f)); }); }
+  if (warns.length)  { html += `<div class="section-head">Warnings (${warns.length})</div>`;    warns.forEach(f  => { html += card(f, flags.indexOf(f)); }); }
+  if (infos.length)  { html += `<div class="section-head">Suggestions (${infos.length})</div>`; infos.forEach(f  => { html += card(f, flags.indexOf(f)); }); }
+  results.innerHTML = html;
+}
+
+function card(f, idx) {
+  const findText = f.original || f.quote || '';
+  const findBtn  = findText ? `<button class="btn-find" onclick="findInDraft(${JSON.stringify(findText)})">Find</button>` : '';
+  const applyBtn = (f.original && f.replacement != null) ? `<button class="btn-apply" onclick="applyFix(${idx})">Apply</button>` : '';
+  const sug = f.suggestion ? `<div class="suggestion"><div class="sug-tag">Try</div><div class="sug-text">${esc(f.suggestion)}</div>${applyBtn}</div>` : '';
+  return `<div class="flag ${f.level}" data-idx="${idx}">
+    <div class="flag-body">
+      <div class="flag-head"><div class="flag-title">${esc(f.title||f.rule)}</div><div class="flag-btns">${findBtn}</div></div>
+      ${f.rule ? `<div class="flag-rule">${esc(f.rule)}</div>` : ''}
+      <div class="flag-detail">${esc(f.detail||'')}</div>
+      ${f.quote ? `<div class="flag-quote">"${esc(trunc(f.quote))}"</div>` : ''}
+    </div>${sug}</div>`;
+}
+
+function applyFix(idx) {
+  const f = currentFlags[idx];
+  if (!f || !f.original) return;
+  const ta = document.getElementById('draft');
+  const i  = ta.value.indexOf(f.original);
+  if (i === -1) { toast('Not found — may already be changed'); return; }
+  ta.value = ta.value.slice(0, i) + (f.replacement || '') + ta.value.slice(i + f.original.length);
+  const el = document.querySelector(`[data-idx="${idx}"]`);
+  if (el) { el.classList.add('applied'); const b = el.querySelector('.btn-apply'); if (b) { b.textContent = 'Applied'; b.disabled = true; } }
+  syncRevised();
+  flashRevised();
+  toast('Applied — re-check when ready');
+}
+
+function findInDraft(text) {
+  if (!text) return;
+  const ta  = document.getElementById('draft');
+  const idx = ta.value.toLowerCase().indexOf(text.toLowerCase());
+  if (idx === -1) { toast('Not found — may already be changed'); return; }
+  ta.focus();
+  ta.setSelectionRange(idx, idx + text.length);
+  ta.classList.add('found');
+  setTimeout(() => ta.classList.remove('found'), 1200);
+  ta.scrollTop = Math.max(0, ta.value.slice(0, idx).split('\n').length * 24 - ta.clientHeight / 2);
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('checkBtn');
+  const res = document.getElementById('results');
+  btn.disabled = on; btn.textContent = on ? 'Checking…' : 'Check Style';
+  if (on) res.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Reading your style guide and draft…</div></div>`;
+}
+
+function showError(msg) {
+  document.getElementById('scoreBar').classList.remove('visible');
+  document.getElementById('results').innerHTML = `<div class="error-box"><div class="error-icon">&#9888;</div><div class="error-msg">${esc(msg)}</div></div>`;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function trunc(s, n=110) { s=s.trim(); return s.length>n ? s.slice(0,n).trim()+'…' : s; }
+
+// ── Revised Draft ──────────────────────────────────────────────────────────────
+function syncRevised() {
+  const ra = document.getElementById('revisedArea');
+  if (ra) ra.value = document.getElementById('draft').value;
+}
+
+function flashRevised() {
+  const ra = document.getElementById('revisedArea');
+  if (!ra) return;
+  ra.classList.remove('flash');
+  void ra.offsetWidth;
+  ra.classList.add('flash');
+  setTimeout(() => ra.classList.remove('flash'), 900);
+}
+
+function copyDraft() {
+  navigator.clipboard.writeText(document.getElementById('draft').value)
+    .then(() => toast('Copied to clipboard'))
+    .catch(() => toast('Copy failed — select all and copy manually'));
+}
+
+function exportTxt() {
+  const text = document.getElementById('draft').value;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'revised-draft.txt'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Downloaded revised-draft.txt');
+}
+
+async function exportDocx() {
+  const text = document.getElementById('draft').value;
+  try {
+    const paragraphs = text.split('\n').map(line => {
+      const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return `<w:p><w:r><w:t xml:space="preserve">${escaped}</w:t></w:r></w:p>`;
+    }).join('');
+
+    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+    const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+    const wordDoc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs}<w:sectPr/></w:body></w:document>`;
+    const wordRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`;
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', rels);
+    zip.file('word/document.xml', wordDoc);
+    zip.file('word/_rels/document.xml.rels', wordRels);
+
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'revised-draft.docx'; a.click();
+    URL.revokeObjectURL(url);
+    toast('Downloaded revised-draft.docx');
+  } catch(e) {
+    toast('Export failed — try .txt instead');
+  }
+}
+</script>
+</body>
+</html>
