@@ -726,24 +726,35 @@ function findInDraft(text) {
   const idx = ta.value.toLowerCase().indexOf(text.toLowerCase());
   if (idx === -1) { toast('Not found — may already be changed'); return; }
 
-  // Highlight in the draft textarea (source of truth for Apply)
-  ta.setSelectionRange(idx, idx + text.length);
-  ta.classList.add('found');
-  setTimeout(() => ta.classList.remove('found'), 1200);
-  ta.scrollTop = Math.max(0, ta.value.slice(0, idx).split('\n').length * 24 - ta.clientHeight / 2);
+  const ra      = document.getElementById('revisedArea');
+  const section = document.getElementById('revisedSection');
 
-  // Also highlight and scroll in the Revised Draft panel if visible
-  const ra = document.getElementById('revisedArea');
-  if (ra && document.getElementById('revisedSection').classList.contains('visible')) {
+  if (ra && section.classList.contains('visible')) {
     const ridx = ra.value.toLowerCase().indexOf(text.toLowerCase());
     if (ridx !== -1) {
+      // Scroll the right panel back to top so the Revised Draft is visible
+      const rightPanel = section.parentElement;
+      if (rightPanel) rightPanel.scrollTop = 0;
+
+      // Temporarily remove readonly so setSelectionRange renders a visible highlight
+      ra.removeAttribute('readonly');
       ra.focus();
       ra.setSelectionRange(ridx, ridx + text.length);
+      ra.setAttribute('readonly', '');
+
+      // Ratio-based scroll — reliable regardless of line wrapping
+      ra.scrollTop = (ridx / Math.max(1, ra.value.length)) * ra.scrollHeight;
+
       ra.classList.add('found');
-      setTimeout(() => ra.classList.remove('found'), 1200);
-      ra.scrollTop = Math.max(0, ra.value.slice(0, ridx).split('\n').length * 24 - ra.clientHeight / 2);
+      setTimeout(() => ra.classList.remove('found'), 1500);
     }
   }
+
+  // Keep draft textarea in sync for Apply accuracy
+  ta.setSelectionRange(idx, idx + text.length);
+  ta.classList.add('found');
+  setTimeout(() => ta.classList.remove('found'), 1500);
+  ta.scrollTop = (idx / Math.max(1, ta.value.length)) * ta.scrollHeight;
 }
 
 function setLoading(on) {
