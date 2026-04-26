@@ -147,10 +147,7 @@
     .flag-detail { font-size: 0.81rem; color: var(--text-2); line-height: 1.5; }
     .flag-quote { margin-top: 6px; font-size: 0.78rem; color: var(--text-3); font-style: italic; word-break: break-word; }
 
-    .btn-find { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: 1px solid var(--bord-2); background: var(--surf-2); color: var(--blue); white-space: nowrap; transition: background 0.15s; }
-    .btn-find:hover { background: rgba(74,159,212,0.12); }
-
-    .suggestion { display: flex; align-items: flex-start; gap: 10px; padding: 9px 13px; background: rgba(5,14,28,0.5); border-top: 1px solid rgba(61,184,122,0.12); }
+.suggestion { display: flex; align-items: flex-start; gap: 10px; padding: 9px 13px; background: rgba(5,14,28,0.5); border-top: 1px solid rgba(61,184,122,0.12); }
     .sug-tag { font-family: 'Bebas Neue', sans-serif; font-size: 0.71rem; letter-spacing: 1px; color: var(--green); flex-shrink: 0; padding-top: 2px; }
     .sug-text { flex: 1; font-size: 0.80rem; color: #9ecfb8; line-height: 1.55; word-break: break-word; }
     .btn-apply { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(61,184,122,0.25); background: rgba(61,184,122,0.1); color: var(--green); white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
@@ -702,13 +699,11 @@ function render(result, draft) {
 }
 
 function card(f, idx) {
-  const findText = f.original || f.quote || '';
-  const findBtn  = findText ? `<button class="btn-find" onclick="findInRevised(${JSON.stringify(findText)})">Find</button>` : '';
   const applyBtn = (f.original && f.replacement != null) ? `<button class="btn-apply" onclick="applyFix(${idx})">Apply</button>` : '';
   const sug = f.suggestion ? `<div class="suggestion"><div class="sug-tag">Try</div><div class="sug-text">${esc(f.suggestion)}</div>${applyBtn}</div>` : '';
   return `<div class="flag ${f.level}" data-idx="${idx}">
     <div class="flag-body">
-      <div class="flag-head"><div class="flag-title">${esc(f.title||f.rule)}</div><div class="flag-btns">${findBtn}</div></div>
+      <div class="flag-head"><div class="flag-title">${esc(f.title||f.rule)}</div></div>
       ${f.rule ? `<div class="flag-rule">${esc(f.rule)}</div>` : ''}
       <div class="flag-detail">${esc(f.detail||'')}</div>
       ${f.quote ? `<div class="flag-quote">"${esc(trunc(f.quote))}"</div>` : ''}
@@ -729,36 +724,6 @@ function applyFix(idx) {
   toast('Applied — re-check when ready');
 }
 
-function findInRevised(text) {
-  if (!text) return;
-  const draft = document.getElementById('draft').value;
-  const idx   = draft.toLowerCase().indexOf(text.toLowerCase());
-  if (idx === -1) { toast('Not found — may already be changed'); return; }
-  highlightInRevised(text);
-}
-
-function highlightInRevised(searchText) {
-  const draft   = document.getElementById('draft').value;
-  const display = document.getElementById('revisedDisplay');
-  if (!display) return;
-
-  const idx = draft.toLowerCase().indexOf(searchText.toLowerCase());
-  if (idx === -1) { syncRevised(); return; }
-
-  const before  = draft.slice(0, idx);
-  const matched = draft.slice(idx, idx + searchText.length);
-  const after   = draft.slice(idx + searchText.length);
-
-  display.innerHTML = (esc(before) + `<mark>${esc(matched)}</mark>` + esc(after))
-    .split('\n')
-    .map(l => `<p>${l || '&nbsp;'}</p>`)
-    .join('');
-
-  const mark = display.querySelector('mark');
-  if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  setTimeout(syncRevised, 2500);
-}
 
 function setLoading(on) {
   const btn = document.getElementById('checkBtn');
