@@ -39,6 +39,8 @@
     .nav-right { display: flex; align-items: center; gap: 20px; }
     .nav-link { font-size: 0.8rem; color: var(--text-2); text-decoration: none; transition: color 0.2s; }
     .nav-link:hover { color: var(--gold); }
+    .btn-reset { font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 600; padding: 6px 14px; border-radius: 5px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-3); transition: border-color 0.18s, color 0.18s; }
+    .btn-reset:hover { border-color: var(--red); color: var(--red); }
 
     /* ── Tool layout ── */
     #tool { flex: 1; display: grid; grid-template-columns: 400px 1fr; min-height: 0; }
@@ -185,7 +187,7 @@
   <a href="index.html" class="nav-logo">Style <span>Checker</span></a>
   <div class="nav-right">
     <a href="index.html" class="nav-link">&#8592; Home</a>
-    <a href="https://github.com/chuckhemann-browns/style-checker" target="_blank" class="nav-link">GitHub</a>
+    <button class="btn-reset" onclick="resetTool()">Clear All</button>
   </div>
 </nav>
 
@@ -291,10 +293,7 @@
 
 <footer class="footer">
   <div class="footer-l"><span>Style Checker</span> &middot; v1.0</div>
-  <div class="footer-r">
-    <a href="https://github.com/chuckhemann-browns/style-checker" target="_blank">View on GitHub</a>
-    &middot; Built with Claude Sonnet
-  </div>
+  <div class="footer-r">Built with Claude Sonnet</div>
 </footer>
 
 <div class="toast" id="toast"></div>
@@ -766,6 +765,16 @@ function flashRevised() {
   void ra.offsetWidth;
   ra.classList.add('flash');
   setTimeout(() => ra.classList.remove('flash'), 900);
+}
+
+function resetTool() {
+  document.getElementById('draft').value = '';
+  document.getElementById('results').innerHTML = `<div class="empty-state">Paste your style guide and draft on the left.<br>Hit Check Style.<br>Violations appear here, sorted by severity.</div>`;
+  document.getElementById('scoreBar').classList.remove('visible');
+  document.getElementById('scoreNum').textContent = '0';
+  document.getElementById('revisedSection').classList.remove('visible');
+  document.getElementById('revisedArea').value = '';
+  currentFlags = [];
 }
 
 function copyDraft() {

@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+node_modules/
+linkedin-carousel.md
+linkedin-post-draft.md
