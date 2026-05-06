@@ -558,12 +558,21 @@ function updateApiStatus() {
   }
 }
 
-const SYSTEM = `You are an expert writing style editor. The user provides their style guide and a draft.
+const SYSTEM = `You are an expert writing style editor. The user provides a STYLE GUIDE and a DRAFT.
+
+CRITICAL BOUNDARY: You are evaluating the DRAFT only. The style guide is reference material — it often contains examples of violations (to show what to avoid). Never flag text that appears only in the style guide. Every violation you report must exist verbatim in the DRAFT.
 
 Your job:
 1. Read the style guide — understand every rule, preference, and prohibition.
-2. Review the draft for violations.
+2. Scan the DRAFT for violations. For each potential violation, verify the offending text exists word-for-word in the DRAFT before including it.
 3. Return ONLY a valid JSON object — no markdown fences, no prose outside JSON.
+
+VERIFICATION RULES — apply before including any flag:
+- The "quote" field must be a substring that appears verbatim in the DRAFT. If you cannot find it there, do not include the flag.
+- The "original" field must be a substring that appears verbatim in the DRAFT. If you cannot copy it exactly from the DRAFT, set it to null.
+- For em-dash violations: only flag if the actual em-dash character (—) or en-dash (–) appears in the DRAFT. Do not flag based on context clues, nearby punctuation, or descriptions. Do not flag em-dashes that appear only in the style guide's own examples.
+- For contraction violations: only flag if the exact non-contracted form ("do not", "it is", "they are", "is not", etc.) appears verbatim in the DRAFT.
+- If you are uncertain whether a violation exists, omit it. False positives are worse than missed violations.
 
 JSON format:
 {
@@ -575,16 +584,16 @@ JSON format:
       "rule": "Rule name from the style guide",
       "title": "Specific violation title",
       "detail": "Why this violates the style guide — specific, not generic.",
-      "quote": "Exact offending text from the draft (verbatim substring, max 120 chars).",
+      "quote": "Exact offending text copied verbatim from the DRAFT (max 120 chars). Must exist in the DRAFT.",
       "suggestion": "Specific proposed rewrite — actual replacement text, not vague advice.",
-      "original": "Exact substring from draft for auto-replace (verbatim). Null if structural.",
+      "original": "Exact substring from DRAFT for auto-replace (verbatim). Null if structural or unconfirmed.",
       "replacement": "Drop-in replacement string. Null if structural or requires judgment."
     }
   ]
 }
 
-Rules: error = hard rule. warn = should fix. info = worth considering.
-original must be copied EXACTLY from the draft. replacement must be a grammatically correct drop-in swap.
+Levels: error = hard rule violation. warn = should fix. info = worth considering.
+original must be copied EXACTLY from the DRAFT. replacement must be a grammatically correct drop-in swap.
 If a fix requires rewriting a full sentence, set original and replacement to null.
 Max 15 flags, prioritized by severity. Return ONLY the JSON object.`;
 
@@ -637,6 +646,21 @@ async function runCheck() {
     catch { throw new Error('Could not parse the response. Try again — this is usually a one-off.'); }
 
     currentFlags = result.flags || [];
+
+    // Client-side validation: strip flags where the quoted text doesn't exist verbatim in the draft.
+    // This is a second line of defense against hallucinated violations (e.g. em-dashes from style
+    // guide examples being attributed to the draft, or contraction flags with no matching text).
+    currentFlags = currentFlags.filter(f => {
+      if (f.quote && !draft.includes(f.quote)) return false;
+      if (f.original && !draft.includes(f.original)) {
+        // original not found — clear it so Apply doesn't fire, but keep the flag
+        f.original = null;
+        f.replacement = null;
+      }
+      return true;
+    });
+    result.flags = currentFlags;
+
     render(result, draft);
     localStorage.setItem('sc_key', apiKey);
 
