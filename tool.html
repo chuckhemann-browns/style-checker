@@ -564,15 +564,42 @@ CRITICAL BOUNDARY: You are evaluating the DRAFT only. The style guide is referen
 
 Your job:
 1. Read the style guide — understand every rule, preference, and prohibition.
-2. Scan the DRAFT for violations. For each potential violation, verify the offending text exists word-for-word in the DRAFT before including it.
+2. Scan the DRAFT for violations using the PRECISION RULES below before flagging anything.
 3. Return ONLY a valid JSON object — no markdown fences, no prose outside JSON.
 
-VERIFICATION RULES — apply before including any flag:
+VERIFICATION RULES — check these before including any flag:
 - The "quote" field must be a substring that appears verbatim in the DRAFT. If you cannot find it there, do not include the flag.
-- The "original" field must be a substring that appears verbatim in the DRAFT. If you cannot copy it exactly from the DRAFT, set it to null.
-- For em-dash violations: only flag if the actual em-dash character (—) or en-dash (–) appears in the DRAFT. Do not flag based on context clues, nearby punctuation, or descriptions. Do not flag em-dashes that appear only in the style guide's own examples.
+- The "original" field must be a substring that appears verbatim in the DRAFT. If you cannot copy it exactly, set it to null.
+- For em-dash violations: only flag if the actual em-dash character (—) or en-dash (–) appears in the DRAFT. Do not flag based on context clues or nearby punctuation.
 - For contraction violations: only flag if the exact non-contracted form ("do not", "it is", "they are", "is not", etc.) appears verbatim in the DRAFT.
 - If you are uncertain whether a violation exists, omit it. False positives are worse than missed violations.
+
+PRECISION RULES — these prevent the most common false positives:
+
+PASSIVE VOICE: Only flag passive voice in sentences doing the primary analytical work — the main claim or core argument of a paragraph. Do NOT flag:
+- Passive voice in setup or context-setting sentences ("the capability problem is largely solved" as framing context)
+- Passive voice inside quotation marks — that is cited material from another author, not the writer's voice
+- State passives that describe a condition rather than hiding an agent ("is known," "is solved," "is driven")
+- Flag at most 2–3 passive instances per draft; if passive appears throughout, flag only the most egregious examples
+
+STACCATO RUNS: Only flag when there are 3 or more CONSECUTIVE sentences each under approximately 10 words. A two-sentence pair (one short, one short) is a deliberate pressure-release device — do NOT flag it. A single short sentence near longer sentences is never a violation. Count only; do not estimate.
+
+BUZZWORDS / BANNED PHRASES: Multi-word phrases must be matched as complete phrases, not split into individual words. Rules:
+- "actionable insights" is banned — "actionable" alone is not
+- "deep dive" is banned — "deep" alone is not
+- "best practices" is banned — "best" alone is not
+- "low-hanging fruit" is banned — "fruit" or "hanging" alone are not
+- Do not flag a single word that is part of a multi-word banned phrase unless the full phrase is present
+- Do not flag buzzwords that appear inside quotation marks (they are cited material)
+
+CLOSING QUESTION / SOFT CTA: Apply this check ONLY to the very last sentence of the entire draft. Mid-post rhetorical questions used as transitions or section setups ("So what does closing this gap actually require?") are not violations — they are structural moves. Only flag if the final sentence of the final paragraph is a question or contains soft CTA language ("feel free to," "share your thoughts," "let me know," "what do you think?").
+
+DATA WITHOUT INTERPRETATION: A statistic or data point is only a violation if no interpretation appears anywhere in the same paragraph OR the immediately following paragraph. If the writer states numbers and then explains their significance within 1–2 paragraphs — even in the next paragraph — that is not a violation. Only flag data that is genuinely stranded with no takeaway, analysis, or "so what" nearby.
+
+PREAMBLE OPENER: Only flag if the opening consists of multiple sentences of warmup with no position taken. Do NOT flag:
+- A single opening sentence, even if it sets context, if it immediately follows with a position
+- An italicized or stylistically distinct opening paragraph — this is intentional framing or a thesis statement, not a preamble
+- Any opening sentence containing a negation ("isn't," "doesn't," "not," "never") or a contrarian claim — those are hooks
 
 JSON format:
 {
