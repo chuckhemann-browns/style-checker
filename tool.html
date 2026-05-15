@@ -153,6 +153,8 @@
     .btn-apply { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(61,184,122,0.25); background: rgba(61,184,122,0.1); color: var(--green); white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
     .btn-apply:hover:not(:disabled) { background: rgba(61,184,122,0.2); }
     .btn-apply:disabled { opacity: 0.35; cursor: default; }
+    .btn-copy-sug { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(74,159,212,0.25); background: rgba(74,159,212,0.08); color: var(--blue); white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
+    .btn-copy-sug:hover { background: rgba(74,159,212,0.18); }
 
     .empty-state { color: var(--text-3); font-size: 0.87rem; line-height: 2; padding: 48px 0; text-align: center; }
     .all-clear { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -620,8 +622,14 @@ JSON format:
 }
 
 Levels: error = hard rule violation. warn = should fix. info = worth considering.
-original must be copied EXACTLY from the DRAFT. replacement must be a grammatically correct drop-in swap.
-If a fix requires rewriting a full sentence, set original and replacement to null.
+
+APPLY BUTTON RULES — these control whether the user gets a one-click fix:
+- original must be copied EXACTLY from the DRAFT (verbatim substring). replacement must be a grammatically correct drop-in swap.
+- For single-word or short-phrase swaps (em-dash removal, contraction fix, buzzword replacement): always provide original and replacement.
+- For single-sentence rewrites (passive → active, removing a soft close, fixing a formal construction): provide the full original sentence as "original" and the full rewritten sentence as "replacement". This gives the user a one-click fix even for sentence-level edits.
+- Only set original and replacement to null when the fix genuinely requires restructuring multiple sentences or paragraphs (e.g., merging a staccato run, cutting a full preamble block, restructuring an argument). These require the writer's judgment.
+- When in doubt, provide original and replacement — a specific fix is always more useful than null.
+
 Max 15 flags, prioritized by severity. Return ONLY the JSON object.`;
 
 async function runCheck() {
@@ -750,8 +758,10 @@ function render(result, draft) {
 }
 
 function card(f, idx) {
-  const applyBtn = (f.original && f.replacement != null) ? `<button class="btn-apply" onclick="applyFix(${idx})">Apply</button>` : '';
-  const sug = f.suggestion ? `<div class="suggestion"><div class="sug-tag">Try</div><div class="sug-text">${esc(f.suggestion)}</div>${applyBtn}</div>` : '';
+  const canApply = f.original && f.replacement != null;
+  const applyBtn = canApply ? `<button class="btn-apply" onclick="applyFix(${idx})">Apply</button>` : '';
+  const copyBtn  = (!canApply && f.suggestion) ? `<button class="btn-copy-sug" onclick="copySuggestion(${idx})" title="Copy suggested rewrite to clipboard">Copy</button>` : '';
+  const sug = f.suggestion ? `<div class="suggestion"><div class="sug-tag">Try</div><div class="sug-text">${esc(f.suggestion)}</div>${applyBtn}${copyBtn}</div>` : '';
   return `<div class="flag ${f.level}" data-idx="${idx}">
     <div class="flag-body">
       <div class="flag-head"><div class="flag-title">${esc(f.title||f.rule)}</div></div>
@@ -775,6 +785,16 @@ function applyFix(idx) {
   toast('Applied — re-check when ready');
 }
 
+
+function copySuggestion(idx) {
+  const f = currentFlags[idx];
+  if (!f || !f.suggestion) return;
+  navigator.clipboard.writeText(f.suggestion).then(() => {
+    const el = document.querySelector(`[data-idx="${idx}"] .btn-copy-sug`);
+    if (el) { el.textContent = 'Copied!'; setTimeout(() => { el.textContent = 'Copy'; }, 1800); }
+    toast('Suggestion copied — paste into your draft');
+  }).catch(() => toast('Copy failed — try selecting the text manually'));
+}
 
 function setLoading(on) {
   const btn = document.getElementById('checkBtn');
