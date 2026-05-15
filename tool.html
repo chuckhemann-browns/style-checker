@@ -156,6 +156,27 @@
     .btn-copy-sug { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 3px 9px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(74,159,212,0.25); background: rgba(74,159,212,0.08); color: var(--blue); white-space: nowrap; flex-shrink: 0; transition: background 0.15s; }
     .btn-copy-sug:hover { background: rgba(74,159,212,0.18); }
 
+    /* ── Generate / Brief section ── */
+    .brief-section { display: none; flex-direction: column; gap: 8px; }
+    .brief-section.open { display: flex; }
+    #brief { min-height: 86px; font-size: 0.84rem; }
+    .btn-generate-draft { font-family: 'Bebas Neue', sans-serif; font-size: 0.95rem; letter-spacing: 2px; color: var(--gold); background: transparent; border: 1px solid rgba(212,175,55,0.45); border-radius: 6px; padding: 7px 16px; cursor: pointer; align-self: flex-end; transition: background 0.15s, border-color 0.15s; }
+    .btn-generate-draft:hover:not(:disabled) { background: rgba(212,175,55,0.1); border-color: var(--gold); }
+    .btn-generate-draft:disabled { opacity: 0.45; cursor: not-allowed; }
+    .brief-hint { font-size: 0.72rem; color: var(--text-3); line-height: 1.5; }
+
+    /* ── Refine bar (inside #revisedPanel) ── */
+    .refine-bar { border-top: 1px solid var(--border); padding: 11px 16px 13px; background: var(--navy-2); flex-shrink: 0; }
+    .refine-label { font-family: 'Bebas Neue', sans-serif; font-size: 0.7rem; letter-spacing: 2px; color: var(--gold); margin-bottom: 7px; }
+    .refine-row { display: flex; gap: 8px; align-items: flex-end; }
+    #refineInput { flex: 1; min-height: 54px; max-height: 96px; resize: none; font-size: 0.81rem; padding: 8px 11px; }
+    .refine-btns { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+    .btn-refine { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; letter-spacing: 2px; color: var(--gold); background: transparent; border: 1px solid rgba(212,175,55,0.4); border-radius: 5px; padding: 6px 14px; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+    .btn-refine:hover:not(:disabled) { background: rgba(212,175,55,0.1); }
+    .btn-refine:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-recheck { font-family: 'Bebas Neue', sans-serif; font-size: 0.85rem; letter-spacing: 2px; color: #fff; background: var(--red); border: none; border-radius: 5px; padding: 6px 14px; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+    .btn-recheck:hover { background: var(--red-2); }
+
     .empty-state { color: var(--text-3); font-size: 0.87rem; line-height: 2; padding: 48px 0; text-align: center; }
     .all-clear { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
     .all-clear-n { font-family: 'Bebas Neue', sans-serif; font-size: 5rem; color: var(--green); line-height: 1; letter-spacing: 3px; }
@@ -246,8 +267,15 @@
       <div class="block-header">
         <div class="block-label">Draft</div>
         <div class="block-actions">
+          <button class="btn-ghost" id="briefToggle" onclick="toggleBrief()">✦ Generate</button>
           <label class="btn-upload">Upload<input type="file" id="draftUpload" accept=".txt,.md"></label>
         </div>
+      </div>
+      <!-- Brief / Generate section (hidden until toggle) -->
+      <div class="brief-section" id="briefSection">
+        <div class="brief-hint">Describe what you want to write — the main point, the format (blog post, LinkedIn, etc.), and any details or examples to include.</div>
+        <textarea id="brief" placeholder="e.g. 'A 700-word blog post arguing that most AI governance frameworks are theater. Lead with the 50-point adoption gap stat. Numbered framework, declarative close.'" spellcheck="true"></textarea>
+        <button class="btn-generate-draft" id="generateBtn" onclick="generateDraft()">Generate Draft</button>
       </div>
       <textarea id="draft" placeholder="Paste your draft — blog post, LinkedIn post, newsletter, chapter, anything."></textarea>
     </div>
@@ -271,6 +299,17 @@
       </div>
     </div>
     <div id="revisedDisplay"></div>
+    <!-- Refine bar — visible in results-mode -->
+    <div class="refine-bar">
+      <div class="refine-label">Refine with Claude</div>
+      <div class="refine-row">
+        <textarea id="refineInput" placeholder="Describe a revision — e.g. 'make the opening punchier' or 'add a numbered framework in the second section'…" spellcheck="true"></textarea>
+        <div class="refine-btns">
+          <button class="btn-refine" id="refineBtn" onclick="refineDraft()">Refine</button>
+          <button class="btn-recheck" onclick="runCheck()">Re-check</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Column 2: Results -->
@@ -794,6 +833,100 @@ function copySuggestion(idx) {
     if (el) { el.textContent = 'Copied!'; setTimeout(() => { el.textContent = 'Copy'; }, 1800); }
     toast('Suggestion copied — paste into your draft');
   }).catch(() => toast('Copy failed — try selecting the text manually'));
+}
+
+// ── Shared Claude API helper ──────────────────────────────────────────
+async function callClaude(system, userMsg) {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      system,
+      messages: [{ role: 'user', content: userMsg }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 401) throw new Error('Invalid API key — check console.anthropic.com.');
+    if (res.status === 429) throw new Error('Rate limit hit. Wait a few seconds and try again.');
+    if (res.status >= 500) throw new Error(`Anthropic API error (${res.status}). Try again in a moment.`);
+    throw new Error(err.error?.message || `API error ${res.status}`);
+  }
+  const data = await res.json();
+  return (data.content?.[0]?.text || '').trim();
+}
+
+// ── Generate Draft ────────────────────────────────────────────────────
+function toggleBrief(forceState) {
+  const section = document.getElementById('briefSection');
+  const toggle  = document.getElementById('briefToggle');
+  const open = forceState !== undefined ? forceState : !section.classList.contains('open');
+  section.classList.toggle('open', open);
+  toggle.classList.toggle('active', open);
+  toggle.textContent = open ? 'Hide' : '✦ Generate';
+  if (open) document.getElementById('brief').focus();
+}
+
+async function generateDraft() {
+  const guide = document.getElementById('styleGuide').value.trim();
+  const brief = document.getElementById('brief').value.trim();
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { toast('Enter your API key first'); return; }
+  if (!guide)  { toast('Load a style guide first — use an example or paste your own'); return; }
+  if (!brief)  { toast('Describe what you want to write'); return; }
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+
+  try {
+    const system = `You are a writing assistant. Draft the content described in the user's brief, following the style guide precisely — voice, structure, rules, and all. Write only the draft. No preamble, no "here's your draft", no explanation. Start immediately with the first word of the piece. Plain text only — no markdown symbols, no # headers, no asterisks.`;
+    const userMsg = `STYLE GUIDE:\n\n${guide}\n\n${'─'.repeat(40)}\n\nBRIEF:\n\n${brief}\n\nWrite the complete draft now.`;
+    const text = await callClaude(system, userMsg);
+    document.getElementById('draft').value = text;
+    toggleBrief(false);
+    toast('Draft ready — review it, then hit Check Style');
+  } catch(err) {
+    toast(err.message || 'Generation failed — try again');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate Draft';
+  }
+}
+
+// ── Refine Draft ──────────────────────────────────────────────────────
+async function refineDraft() {
+  const guide       = document.getElementById('styleGuide').value.trim();
+  const draft       = document.getElementById('draft').value.trim();
+  const instruction = document.getElementById('refineInput').value.trim();
+  const apiKey      = document.getElementById('apiKey').value.trim();
+  if (!apiKey)      { toast('Enter your API key first'); return; }
+  if (!draft)       { toast('No draft to refine'); return; }
+  if (!instruction) { toast('Describe the revision you want'); return; }
+
+  const btn = document.getElementById('refineBtn');
+  btn.disabled = true; btn.textContent = 'Refining…';
+
+  try {
+    const system = `You are a writing assistant. Revise the draft according to the user's instruction. Preserve everything that doesn't need to change. Stay in the voice and follow all rules from the style guide. Return only the revised draft — no preamble, no "here's the revised version", no explanation. Plain text only — no markdown symbols. Start immediately with the first word.`;
+    const userMsg = `STYLE GUIDE:\n\n${guide || '(none provided)'}\n\n${'─'.repeat(40)}\n\nCURRENT DRAFT:\n\n${draft}\n\n${'─'.repeat(40)}\n\nREVISION INSTRUCTION:\n\n${instruction}\n\nWrite the complete revised draft now.`;
+    const text = await callClaude(system, userMsg);
+    document.getElementById('draft').value = text;
+    document.getElementById('refineInput').value = '';
+    syncRevised();
+    flashRevised();
+    toast('Draft revised — hit Re-check to update results');
+  } catch(err) {
+    toast(err.message || 'Refinement failed — try again');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Refine';
+  }
 }
 
 function setLoading(on) {
